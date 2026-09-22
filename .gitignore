@@ -1,0 +1,10 @@
+# seus dados pessoais nunca vão pro GitHub
+dados.json
+dados.json.tmp
+backups/
+
+__pycache__/
+.claude/
+.vercel/
+.env*
+node_modules/

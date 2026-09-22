@@ -1,0 +1,7 @@
+# usados só no modo local
+server.py
+dados.json
+backups/
+__pycache__/
+.claude/
+README.md

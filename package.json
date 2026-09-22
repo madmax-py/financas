@@ -1,0 +1,7 @@
+{
+  "name": "financas",
+  "private": true,
+  "type": "module",
+  "description": "Dashboard de finanças pessoais",
+  "engines": { "node": ">=18" }
+}

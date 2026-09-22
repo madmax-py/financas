@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minhas Finanças</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <!-- LOGIN (só aparece na versão hospedada, ex.: Vercel) -->
+  <div class="login hidden" id="login">
+    <form class="login-box" id="loginForm">
+      <div class="login-icon">💰</div>
+      <h2>Minhas Finanças</h2>
+      <p class="muted small-text">Digite sua senha pra acessar.</p>
+      <input type="password" id="loginPass" class="input" placeholder="Senha" autocomplete="current-password" required>
+      <button type="submit" class="btn primary" id="loginBtn">Entrar</button>
+      <p class="login-err" id="loginErr"></p>
+    </form>
+  </div>
+
+  <!-- ALERTAS -->
+  <div class="alerts" id="alerts"></div>
+
+  <main class="grid">
+    <!-- ESQUERDA -->
+    <aside class="col">
+      <div class="card profile">
+        <div class="profile-top">
+          <span class="rank-chip">💰 <span id="rankLabel">—</span></span>
+          <button class="icon-btn" id="btnSettings" title="Configurações">⚙</button>
+        </div>
+        <label class="photo" title="Trocar foto">
+          <img id="photo" alt="">
+          <span class="photo-empty">＋<br>foto de perfil</span>
+          <input type="file" accept="image/*" id="photoInput" hidden>
+        </label>
+        <div class="profile-name" id="profileName"></div>
+        <div class="save-status" id="saveStatus"></div>
+      </div>
+
+      <div class="section-title">⚡ Saúde financeira</div>
+      <div id="bars" class="bars"></div>
+
+      <div class="card">
+        <div class="card-head spread">📊 Orçamento por categoria <button class="link-btn" data-open="cats">editar</button></div>
+        <div id="catStats" class="stats"></div>
+        <div class="stats-total" id="catTotal"></div>
+      </div>
+    </aside>
+
+    <!-- CENTRO -->
+    <section class="col">
+      <div class="card">
+        <div class="card-head title-row">
+          <span class="page-title">Visão do mês</span>
+          <select id="monthSel" class="select"></select>
+        </div>
+        <div class="chart-box radar-box"><canvas id="radarChart"></canvas></div>
+        <div class="chart-foot">✦ Gastos por categoria · tracejado = orçamento</div>
+      </div>
+
+      <div class="card">
+        <div class="tabs small" id="lineTabs">
+          <button class="tab active" data-mode="dia">📅 Por dia</button>
+          <button class="tab" data-mode="acum">📈 Acumulado</button>
+        </div>
+        <div class="chart-box line-box"><canvas id="lineChart"></canvas></div>
+        <div class="compare" id="compare"></div>
+      </div>
+
+      <div class="card">
+        <div class="tabs small" id="yearTabs">
+          <button class="tab active" data-mode="ano">🗓️ Últimos 12 meses</button>
+          <button class="tab" data-mode="prev">🔮 Previsão</button>
+        </div>
+        <div class="chart-box year-box"><canvas id="yearChart"></canvas></div>
+        <div class="chart-foot" id="yearFoot"></div>
+      </div>
+    </section>
+
+    <!-- DIREITA -->
+    <aside class="col">
+      <div class="card">
+        <div class="card-head">💳 Quanto eu devo</div>
+        <div class="debt-card">
+          <div class="debt-icon">🧾</div>
+          <div>
+            <div class="debt-value" id="debtValue">R$ 0,00</div>
+            <div class="debt-sub" id="debtSub"></div>
+          </div>
+        </div>
+        <div class="quick-actions">
+          <button class="btn gain" data-new="entrada">＋ Entrada</button>
+          <button class="btn spend" data-new="saida">－ Gasto</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head spread">🏦 Saldo <button class="link-btn" data-open="accounts">contas</button></div>
+        <div class="balance" id="balanceValue">R$ 0,00</div>
+        <ul class="list acc-list" id="accList"></ul>
+      </div>
+
+      <div class="card">
+        <div class="card-head spread">💳 Cartões <button class="link-btn" data-open="accounts">editar</button></div>
+        <ul class="list card-list" id="cardList"></ul>
+      </div>
+
+      <div class="card">
+        <div class="card-head">🗓️ Próximas faturas</div>
+        <ul class="list" id="faturasList"></ul>
+        <div class="muted small-text" id="faturasFoot"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head" id="resumoTitle">📋 Resumo</div>
+        <ul class="list checklist" id="resumoList"></ul>
+      </div>
+    </aside>
+  </main>
+
+  <!-- INFERIOR -->
+  <section class="bottom">
+    <h2 class="pursuits">« Seus Lançamentos »</h2>
+    <div class="tabs" id="bottomTabs">
+      <button class="tab active" data-tab="lanc">🧾 Lançamentos</button>
+      <button class="tab" data-tab="parc">💳 Parcelamentos</button>
+      <button class="tab" data-tab="rec">🔁 Recorrentes</button>
+      <button class="tab" data-tab="metas">🎯 Metas</button>
+      <button class="tab" data-tab="cats">🗂️ Categorias</button>
+    </div>
+
+    <div class="panel" id="tab-lanc">
+      <div class="filters">
+        <input id="fSearch" class="input grow" placeholder="🔎 Buscar descrição…">
+        <select id="fType" class="select">
+          <option value="">Todos os tipos</option>
+          <option value="entrada">Entradas</option>
+          <option value="saida">Gastos</option>
+        </select>
+        <select id="fCat" class="select"></select>
+        <select id="fMethod" class="select"></select>
+        <input id="fMin" class="input num" type="number" step="0.01" min="0" placeholder="R$ mín.">
+        <input id="fMax" class="input num" type="number" step="0.01" min="0" placeholder="R$ máx.">
+        <select id="fScope" class="select">
+          <option value="mes">Mês selecionado</option>
+          <option value="todos">Todos os meses</option>
+        </select>
+        <button class="btn ghost" id="fClear" title="Limpar filtros">✕</button>
+      </div>
+      <div class="filters">
+        <div class="table-sum" id="tableSum"></div>
+        <button class="btn ghost" data-open="import">⬆ Importar extrato</button>
+        <button class="btn primary" data-new="saida">＋ Novo lançamento</button>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr>
+            <th class="sortable" data-sort="date">Data</th>
+            <th class="sortable" data-sort="desc">Descrição</th>
+            <th class="sortable" data-sort="cat">Categoria</th>
+            <th class="sortable" data-sort="method">Método</th>
+            <th class="sortable r" data-sort="value">Valor</th>
+            <th></th>
+          </tr></thead>
+          <tbody id="txBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="tab-parc">
+      <div class="card inner">
+        <div class="card-head">📉 Faturas projetadas (próximos 12 meses)</div>
+        <div class="chart-box bar-box"><canvas id="barChart"></canvas></div>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Compra</th><th>Cartão</th><th>Data</th><th>Parcela atual</th><th class="r">Valor parcela</th><th class="r">Falta pagar</th><th></th></tr></thead>
+          <tbody id="parcBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="tab-rec">
+      <div class="filters">
+        <div class="rec-summary" id="recSummary"></div>
+        <button class="btn primary" id="btnNewRec">＋ Nova recorrência</button>
+      </div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Descrição</th><th>Categoria</th><th>Método</th><th>Dia</th><th>Período</th><th>Próximo</th><th class="r">Valor</th><th></th></tr></thead>
+          <tbody id="recBody"></tbody>
+        </table>
+      </div>
+      <p class="muted small-text">Os lançamentos são criados sozinhos quando o dia chega (ou na próxima vez que você abrir o app). Depois de criados, viram lançamentos normais: dá pra editar ou excluir cada um sem mexer na regra. As próximas ocorrências já entram na previsão e nas faturas futuras.</p>
+    </div>
+
+    <div class="panel hidden" id="tab-metas">
+      <div class="filters">
+        <div class="rec-summary" id="goalSummary"></div>
+        <button class="btn primary" id="btnNewGoal">＋ Nova meta</button>
+      </div>
+      <div class="cat-cards" id="goalCards"></div>
+    </div>
+
+    <div class="panel hidden" id="tab-cats">
+      <div class="filters">
+        <div class="rec-summary" id="catSummary"></div>
+        <button class="btn ghost" data-open="cats">✏️ Gerenciar categorias</button>
+      </div>
+      <div class="cat-cards" id="catCards"></div>
+    </div>
+  </section>
+
+  <!-- MODAL LANÇAMENTO -->
+  <dialog id="txDialog">
+    <form id="txForm" class="form">
+      <h3 id="txDialogTitle">Novo lançamento</h3>
+      <div class="seg" id="typeSeg">
+        <label><input type="radio" name="type" value="saida" checked><span>－ Gasto</span></label>
+        <label><input type="radio" name="type" value="entrada"><span>＋ Entrada</span></label>
+      </div>
+      <label>Descrição<input name="desc" class="input" required maxlength="80"></label>
+      <div class="row">
+        <label>Valor (R$)<input name="value" class="input" type="number" step="0.01" min="0.01" required></label>
+        <label>Data<input name="date" class="input" type="date" required></label>
+      </div>
+      <label>Categoria<select name="cat" class="select"></select></label>
+      <div class="row">
+        <label id="methodLabel">Método<select name="method" class="select">
+          <option value="pix">Pix</option>
+          <option value="debito">Débito</option>
+          <option value="dinheiro">Dinheiro</option>
+          <option value="credito">Crédito</option>
+        </select></label>
+        <label id="contaLabel">Conta<select name="conta" class="select"></select></label>
+        <label id="cartaoLabel">Cartão<select name="cartao" class="select"></select></label>
+        <label id="parcLabel">Parcelas<input name="parcelas" class="input" type="number" min="1" max="48" value="1"></label>
+      </div>
+      <p class="muted small-text" id="parcHint"></p>
+      <div id="recRow">
+        <label class="check"><input type="checkbox" name="recorrente"> 🔁 Repetir todo mês</label>
+        <div class="row" id="recOpts">
+          <label>Termina em (opcional)<input name="fim" class="input" type="month" placeholder="mm/aaaa"></label>
+        </div>
+        <p class="muted small-text" id="recHint"></p>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn primary">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL CONFIG -->
+  <dialog id="setDialog">
+    <form id="setForm" class="form">
+      <h3>Configurações</h3>
+      <label>Seu nome<input name="name" class="input" maxlength="40"></label>
+      <label>Meta de reserva (R$)<input name="meta" class="input" type="number" step="0.01" min="0"></label>
+      <div class="row wrap">
+        <button type="button" class="btn ghost" data-open="cats">🗂️ Categorias e orçamentos</button>
+        <button type="button" class="btn ghost" data-open="accounts">🏦 Contas e cartões</button>
+        <button type="button" class="btn ghost" data-open="import">⬆ Importar extrato (CSV/OFX)</button>
+      </div>
+      <div class="row wrap">
+        <button type="button" class="btn ghost" id="btnExport">⬇ Exportar JSON</button>
+        <label class="btn ghost">⬆ Importar JSON<input type="file" accept="application/json" id="importInput" hidden></label>
+        <button type="button" class="btn ghost" id="btnRemovePhoto">🗑 Remover foto</button>
+        <button type="button" class="btn ghost hidden" id="btnLogout">🚪 Sair</button>
+        <button type="button" class="btn danger" id="btnReset">Apagar tudo</button>
+      </div>
+      <p class="muted small-text" id="backupNote">💾 O servidor guarda uma cópia do <code>dados.json</code> por dia na pasta <code>backups/</code> (últimos 30 dias).</p>
+      <div class="form-actions">
+        <button type="button" class="btn ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn primary">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL CATEGORIAS -->
+  <dialog id="catsDialog" class="wide">
+    <form id="catsForm" class="form">
+      <h3>Categorias e orçamentos</h3>
+      <p class="muted small-text">O orçamento é o teto mensal de gasto da categoria (deixe 0 pra não ter teto). Categorias removidas passam seus lançamentos pra "Outros".</p>
+      <div class="mgr-head"><b class="neg">Gastos</b><span class="muted">emoji · nome · orçamento/mês</span></div>
+      <div class="mgr" id="catsSaida"></div>
+      <button type="button" class="btn ghost small" data-add-cat="saida">＋ Categoria de gasto</button>
+      <div class="mgr-head"><b class="pos">Entradas</b><span class="muted">emoji · nome</span></div>
+      <div class="mgr" id="catsEntrada"></div>
+      <button type="button" class="btn ghost small" data-add-cat="entrada">＋ Categoria de entrada</button>
+      <div class="form-actions">
+        <button type="button" class="btn ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn primary">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL CONTAS E CARTÕES -->
+  <dialog id="accDialog" class="wide">
+    <form id="accForm" class="form">
+      <h3>Contas e cartões</h3>
+      <div class="mgr-head"><b>🏦 Contas</b><span class="muted">nome · saldo inicial</span></div>
+      <div class="mgr" id="accRows"></div>
+      <button type="button" class="btn ghost small" id="btnAddAcc">＋ Conta</button>
+      <div class="mgr-head"><b>💳 Cartões de crédito</b><span class="muted">nome · limite · dia que fecha · dia que vence · pago pela conta</span></div>
+      <div class="mgr" id="cardRows"></div>
+      <button type="button" class="btn ghost small" id="btnAddCard">＋ Cartão</button>
+      <p class="muted small-text">Compras feitas a partir do dia de fechamento caem na fatura seguinte. Removendo uma conta ou cartão, os lançamentos dele vão pro primeiro da lista.</p>
+      <div class="form-actions">
+        <button type="button" class="btn ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn primary">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL META -->
+  <dialog id="goalDialog">
+    <form id="goalForm" class="form">
+      <h3 id="goalDialogTitle">Nova meta</h3>
+      <div class="row">
+        <label class="emoji-field">Emoji<input name="emoji" class="input" maxlength="4" value="🎯"></label>
+        <label>Nome<input name="name" class="input" required maxlength="40" placeholder="Viagem, notebook, reserva…"></label>
+      </div>
+      <div class="row">
+        <label>Quanto quer juntar (R$)<input name="alvo" class="input" type="number" step="0.01" min="0.01" required></label>
+        <label>Até quando (opcional)<input name="prazo" class="input" type="month" placeholder="mm/aaaa"></label>
+      </div>
+      <label id="goalInitLabel">Já tenho guardado (R$)<input name="inicial" class="input" type="number" step="0.01" min="0" value="0"></label>
+      <div class="form-actions">
+        <button type="button" class="btn ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn primary">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL APORTE -->
+  <dialog id="depDialog">
+    <form id="depForm" class="form">
+      <h3 id="depTitle">Guardar dinheiro</h3>
+      <div class="seg">
+        <label><input type="radio" name="dir" value="1" checked><span class="gain-opt">＋ Guardar</span></label>
+        <label><input type="radio" name="dir" value="-1"><span class="spend-opt">－ Retirar</span></label>
+      </div>
+      <div class="row">
+        <label>Valor (R$)<input name="value" class="input" type="number" step="0.01" min="0.01" required></label>
+        <label>Data<input name="date" class="input" type="date" required></label>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn primary">Confirmar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL IMPORTAÇÃO -->
+  <dialog id="impDialog" class="wide">
+    <form id="impForm" class="form">
+      <h3>Importar extrato</h3>
+      <p class="muted small-text">Aceita CSV (Nubank, Inter, planilhas…) e OFX, que a maioria dos bancos exporta. O arquivo é lido só aqui no seu navegador.</p>
+      <div class="row">
+        <label>Arquivo<input type="file" id="impFile" class="input" accept=".csv,.ofx,.txt,text/csv"></label>
+        <label>Destino<select id="impDest" class="select"></select></label>
+      </div>
+      <div class="row hidden" id="impMap">
+        <label>Coluna da data<select id="impColDate" class="select"></select></label>
+        <label>Coluna da descrição<select id="impColDesc" class="select"></select></label>
+        <label>Coluna do valor<select id="impColVal" class="select"></select></label>
+      </div>
+      <label class="check hidden" id="impSignRow"><input type="checkbox" id="impPositiveSpend"> Valores positivos são gastos (comum em fatura de cartão)</label>
+      <div class="imp-preview hidden" id="impPreviewWrap">
+        <div class="imp-bar"><span id="impCount"></span><button type="button" class="link-btn" id="impToggleAll">marcar/desmarcar tudo</button></div>
+        <div class="table-wrap imp-table">
+          <table class="table">
+            <thead><tr><th></th><th>Data</th><th>Descrição</th><th>Categoria</th><th class="r">Valor</th></tr></thead>
+            <tbody id="impBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn primary" id="impSubmit" disabled>Importar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
