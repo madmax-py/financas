@@ -189,7 +189,13 @@ function migrate(s, fresh = false) {
       }
     }
   }
-  if (!s.accounts?.length) s.accounts = [{ id: uid(), name: "Conta principal", inicial: 0 }];
+  if (!s.accounts?.length) s.accounts = [{ id: uid(), name: "Conta principal", inicial: 0, tipo: "corrente" }];
+  for (const a of s.accounts) a.tipo ||= "corrente";
+  s.check ||= { periodo: 7, ultimo: null, historico: [] };
+  for (const type of ["saida", "entrada"]) {
+    s.cats[type] ||= [];
+    if (!s.cats[type].some((c) => c.name === "Ajuste")) s.cats[type].push({ name: "Ajuste", emoji: "⚖️", budget: 0 });
+  }
   if (!s.cards) {
     // versão antiga tinha um único "limite do cartão" e toda compra caía na fatura do mês seguinte:
     // fechamento dia 1 + vencimento dia 10 reproduz exatamente isso
@@ -212,7 +218,7 @@ function normalizeRefs(s = state) {
   }
   for (const t of [...s.tx, ...s.rec]) {
     if (!s.cats[t.type].some((c) => c.name === t.cat)) t.cat = "Outros";
-    if (t.type === "saida" && t.method === "credito") {
+    if (t.method === "credito") {
       if (!cardIds.has(t.cartao)) t.cartao = s.cards[0]?.id || null;
       delete t.conta;
     } else {
@@ -227,6 +233,7 @@ const accById = (id) => state.accounts.find((a) => a.id === id) || state.account
 const cardById = (id) => state.cards.find((c) => c.id === id) || null;
 const catEmoji = (type, name) => state.cats[type].find((c) => c.name === name)?.emoji || "•";
 const methodLabel = (t) => {
+  if (t.method === "credito" && t.type === "entrada") return `${cardById(t.cartao)?.name || "Cartão"} · estorno`;
   if (t.type === "entrada") return state.accounts.length > 1 ? accById(t.conta).name : "—";
   if (t.method === "credito") return `${cardById(t.cartao)?.name || "Crédito"}${t.parcelas > 1 ? ` ${t.parcelas}x` : ""}`;
   return `${METHODS[t.method]}${state.accounts.length > 1 ? ` · ${accById(t.conta).name}` : ""}`;
@@ -243,13 +250,15 @@ function firstDueMonth(card, date) {
 const dueDay = (card, k) => `${k}-${pad(Math.min(card?.vence || 10, daysIn(k)))}`;
 
 function installments(t) {
-  if (t.type !== "saida" || t.method !== "credito") return [];
+  if (t.method !== "credito") return [];
   const card = cardById(t.cartao);
-  const n = Math.max(1, t.parcelas | 0);
+  // entrada no crédito = estorno/desconto: entra na fatura com sinal negativo
+  const sinal = t.type === "entrada" ? -1 : 1;
+  const n = sinal < 0 ? 1 : Math.max(1, t.parcelas | 0);
   const k0 = firstDueMonth(card, t.date);
   return Array.from({ length: n }, (_, i) => {
     const due = addM(k0, i);
-    return { t, i, n, card, due, dueDate: dueDay(card, due), value: t.value / n };
+    return { t, i, n, card, due, dueDate: dueDay(card, due), value: (sinal * t.value) / n };
   });
 }
 
@@ -311,8 +320,9 @@ function compute() {
   const acc = (id) => (id in bal ? id : state.accounts[0].id);
   for (const t of state.tx) {
     if (t.date > TODAY) continue;
+    if (t.method === "credito") continue; // crédito só mexe no saldo quando a fatura vence
     if (t.type === "entrada") bal[acc(t.conta)] += t.value;
-    else if (t.method !== "credito") bal[acc(t.conta)] -= t.value;
+    else bal[acc(t.conta)] -= t.value;
   }
   for (const x of instReal) if (x.dueDate < TODAY) bal[acc(x.card?.conta)] -= x.value;
   const balance = sum(Object.values(bal));
@@ -475,9 +485,17 @@ function renderAlerts(c) {
   }
   for (const g of state.goals) if (goalSaved(g) >= g.alvo && g.alvo > 0) list.push(["gain", "🏆", `Meta ${g.emoji} ${g.name} concluída!`]);
 
+  if (checkAtrasada() && !ui.dismissed.has("check")) {
+    const d = diasDesdeCheck();
+    list.unshift(["warn", "✅", d === null
+      ? "Confira se os saldos do app batem com os do seu banco."
+      : `Faz ${d} dia(s) desde a última conferência de saldos.`, "check"]);
+  }
   const visible = list.filter(([, , text]) => !ui.dismissed.has(text));
-  $("#alerts").innerHTML = visible.map(([level, icon, text]) =>
-    `<div class="alert ${level}"><span>${icon}</span><span class="alert-text">${esc(text)}</span><button class="alert-x" data-dismiss="${esc(text)}" title="Dispensar">✕</button></div>`).join("");
+  $("#alerts").innerHTML = visible.map(([level, icon, text, acao]) =>
+    `<div class="alert ${level}"><span>${icon}</span><span class="alert-text">${esc(text)}</span>`
+    + (acao === "check" ? `<button class="link-btn" data-open="check">conferir agora</button>` : "")
+    + `<button class="alert-x" data-dismiss="${esc(acao || text)}" title="Dispensar">✕</button></div>`).join("");
 }
 
 function renderProfile(m) {
@@ -539,12 +557,16 @@ function renderRight(c, m, prev) {
   bal.textContent = brl(c.balance);
   bal.classList.toggle("neg", c.balance < 0);
   const accRows = state.accounts.length > 1
-    ? state.accounts.map((a) => `<li><span>${esc(a.name)}</span><span class="v ${c.bal[a.id] < 0 ? "neg" : ""}">${brl(c.bal[a.id])}</span></li>`)
+    ? state.accounts.map((a) => `<li><span>${a.tipo === "investimento" ? "📈 " : ""}${esc(a.name)}</span><span class="v ${c.bal[a.id] < 0 ? "neg" : ""}">${brl(c.bal[a.id])}</span></li>`)
     : [];
   if (c.guardado) {
     accRows.push(`<li class="muted"><span>🎯 Guardado em metas</span><span class="v">− ${brl(c.guardado)}</span></li>`);
     accRows.push(`<li><span><b>Livre pra usar</b></span><span class="v ${c.balance - c.guardado < 0 ? "neg" : "pos"}"><b>${brl(c.balance - c.guardado)}</b></span></li>`);
   }
+  const dCheck = diasDesdeCheck();
+  $("#checkFoot").textContent = state.check.ultimo
+    ? `Última conferência: ${fmtDate(state.check.ultimo)}${dCheck ? ` (${dCheck} dia(s) atrás)` : " (hoje)"}`
+    : "Nunca conferido com o banco";
   $("#accList").innerHTML = accRows.join("") || `<li class="muted small-text">Entradas − gastos à vista − faturas já vencidas</li>`;
 
   $("#cardList").innerHTML = c.cards.length ? c.cards.map(({ c: card, used, nextK, nextV }) => {
@@ -1063,9 +1085,13 @@ catsForm.addEventListener("submit", (e) => {
 
 // ===== Contas e cartões =====
 const accDialog = $("#accDialog"), accForm = $("#accForm");
-const accRow = (a = { id: uid(), name: "", inicial: 0 }) => `
+const accRow = (a = { id: uid(), name: "", inicial: 0, tipo: "corrente" }) => `
   <div class="mgr-row" data-id="${a.id}">
     <input class="input" value="${esc(a.name)}" maxlength="30" placeholder="Nome da conta" data-f="name" required>
+    <select class="select" data-f="tipo" title="Tipo">
+      <option value="corrente" ${a.tipo !== "investimento" ? "selected" : ""}>Conta</option>
+      <option value="investimento" ${a.tipo === "investimento" ? "selected" : ""}>Investimento</option>
+    </select>
     <input class="input num" type="number" step="0.01" value="${a.inicial || 0}" data-f="inicial" title="Saldo inicial">
     <button type="button" class="icon-btn" data-remove title="Remover">🗑️</button>
   </div>`;
@@ -1105,7 +1131,7 @@ accForm.addEventListener("click", (e) => {
 accForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const get = (row, f) => row.querySelector(`[data-f=${f}]`).value;
-  const accounts = [...$("#accRows").querySelectorAll(".mgr-row")].map((r) => ({ id: r.dataset.id, name: get(r, "name").trim(), inicial: round2(Number(get(r, "inicial")) || 0) }));
+  const accounts = [...$("#accRows").querySelectorAll(".mgr-row")].map((r) => ({ id: r.dataset.id, name: get(r, "name").trim(), inicial: round2(Number(get(r, "inicial")) || 0), tipo: get(r, "tipo") }));
   const day = (v) => Math.max(1, Math.min(31, Number(v) || 1));
   const cards = [...$("#cardRows").querySelectorAll(".mgr-row")].map((r) => ({ id: r.dataset.id, name: get(r, "name").trim(), limite: round2(Number(get(r, "limite")) || 0), fecha: day(get(r, "fecha")), vence: day(get(r, "vence")), conta: get(r, "conta") }));
   if (!accounts.length || [...accounts, ...cards].some((x) => !x.name)) { alert("Dê um nome pra cada conta e cartão."); return; }
@@ -1115,6 +1141,137 @@ accForm.addEventListener("submit", (e) => {
   state.cards = cards;
   normalizeRefs();
   accDialog.close();
+  refresh();
+});
+
+
+// ===== Conferência (bate os saldos do app com os do banco) =====
+const checkDialog = $("#checkDialog"), checkForm = $("#checkForm");
+const diasDesdeCheck = () => (state.check.ultimo ? Math.floor((Date.parse(TODAY) - Date.parse(state.check.ultimo)) / 86400000) : null);
+const checkAtrasada = () => {
+  if (!state.check.periodo) return false;
+  const d = diasDesdeCheck();
+  return d === null ? state.tx.length > 0 : d >= state.check.periodo;
+};
+
+function openCheck() {
+  const c = compute();
+  const linhas = [
+    ...state.accounts.map((a) => ({
+      kind: "acc", id: a.id, modo: "saldo",
+      titulo: `${a.tipo === "investimento" ? "📈" : "🏦"} ${a.name}`,
+      pergunta: a.tipo === "investimento" ? "quanto a carteira vale hoje" : "quanto tem no extrato",
+      esperado: round2(c.bal[a.id] ?? 0),
+    })),
+    ...state.cards.map((card) => {
+      const info = c.cards.find((x) => x.c.id === card.id);
+      const temLimite = !!card.limite;
+      return {
+        kind: "card", id: card.id, modo: temLimite ? "disponivel" : "usado",
+        titulo: `💳 ${card.name}`,
+        pergunta: temLimite ? "limite disponível no app do banco" : "total comprometido (sem limite cadastrado)",
+        esperado: round2(temLimite ? card.limite - info.used : info.used),
+      };
+    }),
+  ];
+  $("#checkRows").innerHTML = linhas.map((l) => `
+    <div class="check-row" data-kind="${l.kind}" data-id="${l.id}" data-modo="${l.modo}">
+      <div class="check-label"><b>${esc(l.titulo)}</b><span class="muted">${esc(l.pergunta)} · o app diz ${brl(l.esperado)}</span></div>
+      <input class="input num" type="number" step="0.01" placeholder="R$ de verdade">
+    </div>`).join("");
+  $("#checkResult").classList.add("hidden");
+  $("#checkResult").innerHTML = "";
+  $("#checkSubmit").textContent = "Conferir";
+  checkForm.dataset.fase = "perguntar";
+  checkDialog.showModal();
+  $("#checkRows input")?.focus();
+}
+
+function checkDiffs() {
+  const c = compute();
+  const out = [];
+  for (const row of $$("#checkRows .check-row")) {
+    const bruto = row.querySelector("input").value.trim();
+    if (bruto === "") continue;
+    const informado = round2(Number(bruto));
+    if (!Number.isFinite(informado)) continue;
+    const { kind, id, modo } = row.dataset;
+    if (kind === "acc") {
+      const a = accById(id);
+      const esperado = round2(c.bal[id] ?? 0);
+      const dif = round2(informado - esperado);
+      if (Math.abs(dif) >= 0.01) out.push({ kind, id, nome: a.name, investimento: a.tipo === "investimento", esperado, informado, dif });
+    } else {
+      const card = cardById(id);
+      const info = c.cards.find((x) => x.c.id === id);
+      const usadoReal = round2(modo === "usado" ? informado : (card.limite || 0) - informado);
+      const dif = round2(usadoReal - round2(info.used));
+      if (Math.abs(dif) >= 0.01) out.push({ kind, id, nome: card.name, esperado: round2(info.used), informado: usadoReal, dif });
+    }
+  }
+  return out;
+}
+
+function descreveDiff(d) {
+  if (d.kind === "acc") {
+    const falta = d.dif < 0;
+    const oque = d.investimento ? (falta ? "Perda/retirada" : "Rendimento") : "Ajuste de conferência";
+    return `<b>${esc(d.nome)}</b>: o app dizia ${brl(d.esperado)} e você tem ${brl(d.informado)}.<br>
+      <span class="muted">Vou lançar </span><span class="${falta ? "neg" : "pos"}">${falta ? "−" : "+"} ${brl(Math.abs(d.dif))}</span>
+      <span class="muted"> como "${oque}" em ${esc(d.nome)}.</span>`;
+  }
+  const maior = d.dif > 0;
+  return `<b>${esc(d.nome)}</b>: o app dizia ${brl(d.esperado)} comprometidos e o banco diz ${brl(d.informado)}.<br>
+    <span class="muted">Vou lançar </span><span class="${maior ? "neg" : "pos"}">${maior ? "uma compra de" : "um estorno de"} ${brl(Math.abs(d.dif))}</span>
+    <span class="muted"> nesse cartão${maior ? "" : " (desconto na fatura)"}.</span>`;
+}
+
+checkForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (checkForm.dataset.fase === "perguntar") {
+    const diffs = checkDiffs();
+    ui.checkDiffs = diffs;
+    const box = $("#checkResult");
+    box.classList.remove("hidden");
+    if (!diffs.length) {
+      box.innerHTML = `<div class="check-ok">✅ Tudo bate. Nada pra ajustar.</div>`;
+      $("#checkSubmit").textContent = "Marcar como conferido";
+    } else {
+      box.innerHTML = `<div class="mgr-head"><b>Diferenças encontradas</b><span class="muted">desmarque o que não quiser ajustar</span></div>`
+        + diffs.map((d, i) => `<label class="check-diff"><input type="checkbox" data-diff="${i}" checked><span>${descreveDiff(d)}</span></label>`).join("");
+      $("#checkSubmit").textContent = `Aplicar ${diffs.length} ajuste(s)`;
+    }
+    checkForm.dataset.fase = "aplicar";
+    return;
+  }
+  // fase de aplicar
+  const marcados = new Set($$("#checkResult [data-diff]").filter((i) => i.checked).map((i) => Number(i.dataset.diff)));
+  const aplicados = [];
+  (ui.checkDiffs || []).forEach((d, i) => {
+    if (!marcados.has(i)) return;
+    const valor = round2(Math.abs(d.dif));
+    if (d.kind === "acc") {
+      const sobrou = d.dif > 0;
+      state.tx.push({
+        id: uid(), type: sobrou ? "entrada" : "saida",
+        desc: d.investimento ? (sobrou ? "Rendimento (conferência)" : "Perda/retirada (conferência)") : "Ajuste de conferência",
+        cat: d.investimento && sobrou ? "Investimentos" : "Ajuste",
+        value: valor, date: TODAY, method: sobrou ? "pix" : "debito", parcelas: 1, conta: d.id, ajuste: true,
+      });
+    } else {
+      state.tx.push({
+        id: uid(), type: d.dif > 0 ? "saida" : "entrada",
+        desc: d.dif > 0 ? "Ajuste de conferência" : "Estorno (conferência)",
+        cat: "Ajuste", value: valor, date: TODAY, method: "credito", parcelas: 1, cartao: d.id, ajuste: true,
+      });
+    }
+    aplicados.push({ nome: d.nome, dif: d.dif });
+  });
+  state.check.ultimo = TODAY;
+  state.check.historico = [...(state.check.historico || []), { date: TODAY, itens: aplicados }].slice(-24);
+  ui.dismissed.add("check");
+  normalizeRefs();
+  checkDialog.close();
   refresh();
 });
 
@@ -1439,6 +1596,7 @@ const setDialog = $("#setDialog"), setForm = $("#setForm"), setF = setForm.eleme
 $("#btnSettings").addEventListener("click", () => {
   setF.name.value = state.profile.name;
   setF.meta.value = state.profile.meta || "";
+  setF.check.value = String(state.check.periodo ?? 7);
   $("#btnLogout").classList.toggle("hidden", !ui.cloud);
   $("#backupNote").innerHTML = ui.cloud
     ? "💾 A nuvem guarda uma cópia dos seus dados por dia (últimos 30 dias). Use também o Exportar JSON de vez em quando."
@@ -1449,6 +1607,7 @@ setForm.addEventListener("submit", (e) => {
   e.preventDefault();
   state.profile.name = setF.name.value.trim();
   state.profile.meta = Number(setF.meta.value) || 0;
+  state.check.periodo = Number(setF.check.value) || 0;
   save();
   setDialog.close();
   render();
@@ -1491,7 +1650,7 @@ $("#btnReset").addEventListener("click", () => {
 });
 
 // ===== Navegação =====
-const openers = { cats: openCats, accounts: openAccounts, import: openImport };
+const openers = { cats: openCats, accounts: openAccounts, import: openImport, check: openCheck };
 document.addEventListener("click", (e) => {
   const op = e.target.closest("[data-open]");
   if (op) {

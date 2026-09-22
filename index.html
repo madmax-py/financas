@@ -103,9 +103,10 @@
       </div>
 
       <div class="card">
-        <div class="card-head spread">🏦 Saldo <button class="link-btn" data-open="accounts">contas</button></div>
+        <div class="card-head spread">🏦 Saldo <span><button class="link-btn" data-open="check">conferir</button> · <button class="link-btn" data-open="accounts">contas</button></span></div>
         <div class="balance" id="balanceValue">R$ 0,00</div>
         <ul class="list acc-list" id="accList"></ul>
+        <div class="muted small-text" id="checkFoot"></div>
       </div>
 
       <div class="card">
@@ -264,11 +265,20 @@
     <form id="setForm" class="form">
       <h3>Configurações</h3>
       <label>Seu nome<input name="name" class="input" maxlength="40"></label>
-      <label>Meta de reserva (R$)<input name="meta" class="input" type="number" step="0.01" min="0"></label>
+      <div class="row">
+        <label>Meta de reserva (R$)<input name="meta" class="input" type="number" step="0.01" min="0"></label>
+        <label>Lembrete de conferência<select name="check" class="select">
+          <option value="7">Toda semana</option>
+          <option value="15">A cada 15 dias</option>
+          <option value="30">Todo mês</option>
+          <option value="0">Nunca</option>
+        </select></label>
+      </div>
       <div class="row wrap">
         <button type="button" class="btn ghost" data-open="cats">🗂️ Categorias e orçamentos</button>
         <button type="button" class="btn ghost" data-open="accounts">🏦 Contas e cartões</button>
         <button type="button" class="btn ghost" data-open="import">⬆ Importar extrato (CSV/OFX)</button>
+        <button type="button" class="btn ghost" data-open="check">✅ Fazer conferência</button>
       </div>
       <div class="row wrap">
         <button type="button" class="btn ghost" id="btnExport">⬇ Exportar JSON</button>
@@ -356,6 +366,20 @@
       <div class="form-actions">
         <button type="button" class="btn ghost" data-close>Cancelar</button>
         <button type="submit" class="btn primary">Confirmar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL CONFERÊNCIA -->
+  <dialog id="checkDialog" class="wide">
+    <form id="checkForm" class="form">
+      <h3>✅ Conferência</h3>
+      <p class="muted small-text">Abra o app do seu banco e diga quanto tem de verdade. O que ficar em branco é ignorado. Nada é alterado sem você confirmar na tela seguinte.</p>
+      <div class="mgr" id="checkRows"></div>
+      <div class="hidden" id="checkResult"></div>
+      <div class="form-actions">
+        <button type="button" class="btn ghost" data-close>Fechar</button>
+        <button type="submit" class="btn primary" id="checkSubmit">Conferir</button>
       </div>
     </form>
   </dialog>
