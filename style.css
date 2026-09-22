@@ -416,3 +416,6 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-si
 .check-diff input { margin-top: 3px; accent-color: #e4e4e4; }
 .check-ok { text-align: center; padding: 14px; color: var(--gain); }
 #checkResult .mgr-head { margin-bottom: 4px; }
+
+.prog { display: flex; flex-direction: column; gap: 3px; min-width: 110px; font-size: 11.5px; color: var(--muted); }
+.prog .mini { height: 4px; }

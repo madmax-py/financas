@@ -177,6 +177,15 @@
     </div>
 
     <div class="panel hidden" id="tab-parc">
+      <div class="card inner" id="boletoCard">
+        <div class="card-head">🧾 Carnês e boletos parcelados</div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Descrição</th><th>Conta</th><th>Progresso</th><th>Próxima</th><th class="r">Valor atual</th><th class="r">Falta pagar</th><th></th></tr></thead>
+            <tbody id="boletoBody"></tbody>
+          </table>
+        </div>
+      </div>
       <div class="card inner">
         <div class="card-head">📉 Faturas projetadas (próximos 12 meses)</div>
         <div class="chart-box bar-box"><canvas id="barChart"></canvas></div>
@@ -240,10 +249,15 @@
           <option value="debito">Débito</option>
           <option value="dinheiro">Dinheiro</option>
           <option value="credito">Crédito</option>
+          <option value="boleto">Boleto / carnê</option>
         </select></label>
         <label id="contaLabel">Conta<select name="conta" class="select"></select></label>
         <label id="cartaoLabel">Cartão<select name="cartao" class="select"></select></label>
-        <label id="parcLabel">Parcelas<input name="parcelas" class="input" type="number" min="1" max="48" value="1"></label>
+        <label id="parcLabel">Parcelas<input name="parcelas" class="input" type="number" min="1" max="240" value="1"></label>
+        <label id="modoLabel">Valor informado é<select name="modo" class="select">
+          <option value="parcela">o de cada parcela</option>
+          <option value="total">o total (divido pra você)</option>
+        </select></label>
       </div>
       <p class="muted small-text" id="parcHint"></p>
       <div id="recRow">

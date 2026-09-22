@@ -6,7 +6,7 @@ const DEFAULT_CATS = {
     ["Educação", "📚"], ["Compras", "🛍️"], ["Assinaturas", "📺"], ["Outros", "📦"]],
   entrada: [["Salário", "💼"], ["Freelance", "💻"], ["Investimentos", "📈"], ["Presente", "🎁"], ["Outros", "➕"]],
 };
-const METHODS = { pix: "Pix", debito: "Débito", dinheiro: "Dinheiro", credito: "Crédito" };
+const METHODS = { pix: "Pix", debito: "Débito", dinheiro: "Dinheiro", credito: "Crédito", boleto: "Boleto" };
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 // ===== Helpers =====
@@ -236,7 +236,8 @@ const methodLabel = (t) => {
   if (t.method === "credito" && t.type === "entrada") return `${cardById(t.cartao)?.name || "Cartão"} · estorno`;
   if (t.type === "entrada") return state.accounts.length > 1 ? accById(t.conta).name : "—";
   if (t.method === "credito") return `${cardById(t.cartao)?.name || "Crédito"}${t.parcelas > 1 ? ` ${t.parcelas}x` : ""}`;
-  return `${METHODS[t.method]}${state.accounts.length > 1 ? ` · ${accById(t.conta).name}` : ""}`;
+  const parcela = t.method === "boleto" && t.parcelas > 1 ? ` ${t.parcela}/${t.parcelas}` : "";
+  return `${METHODS[t.method]}${parcela}${state.accounts.length > 1 ? ` · ${accById(t.conta).name}` : ""}`;
 };
 
 // ===== Cartões e parcelas =====
@@ -354,8 +355,11 @@ function compute() {
     proj.push({ k, ent, sai, fat, saldo });
   }
 
+  const boletosFuturos = state.tx.filter((t) => t.method === "boleto" && t.type === "saida" && t.date > TODAY);
+  const boletos = sum(boletosFuturos, (t) => t.value);
   const guardado = sum(state.goals, (g) => goalSaved(g));
-  return { virt, instReal, pending, debt, bal, balance, faturas, cards, limitTotal, proj, guardado };
+  return { virt, instReal, pending, debt, cardDebt: debt, boletos, boletosFuturos, devoTotal: debt + boletos,
+    bal, balance, faturas, cards, limitTotal, proj, guardado };
 }
 
 const goalSaved = (g) => sum(g.aportes || [], (a) => a.value);
@@ -444,7 +448,7 @@ function render() {
   const parts = [
     () => renderAlerts(c), () => renderProfile(m), () => renderBars(c, m), () => renderCatStats(m, prev),
     () => renderRight(c, m, prev), () => renderCharts(c, m, prev), renderTable, () => renderParcelas(c),
-    renderRec, renderGoals, () => renderCatCards(m, prev),
+    renderRec, renderBoletos, renderGoals, () => renderCatCards(m, prev),
   ];
   for (const part of parts) {
     try { part(); } catch (err) { console.error("Erro ao desenhar parte da tela:", err); }
@@ -547,11 +551,12 @@ function renderCatStats(m, prev) {
 }
 
 function renderRight(c, m, prev) {
-  $("#debtValue").textContent = brl(c.debt);
+  $("#debtValue").textContent = brl(c.devoTotal);
   const next = c.faturas.find((f) => f.v > 0);
-  $("#debtSub").textContent = c.pending.length
-    ? `${c.pending.length} parcela(s) pendente(s) · próxima fatura ${mShort(next.k)}: ${brl(next.v)}`
-    : "Nenhuma compra no crédito pendente";
+  const partes = [];
+  if (c.cardDebt) partes.push(`cartões ${brl(c.cardDebt)}${next ? ` (próxima fatura ${mShort(next.k)}: ${brl(next.v)})` : ""}`);
+  if (c.boletos) partes.push(`carnês ${brl(c.boletos)} em ${c.boletosFuturos.length} parcela(s)`);
+  $("#debtSub").textContent = partes.join(" · ") || "Nada pendente no crédito ou em carnês";
 
   const bal = $("#balanceValue");
   bal.textContent = brl(c.balance);
@@ -686,7 +691,7 @@ function renderFilterOptions() {
     + `<optgroup label="Gastos">${state.cats.saida.map((c) => `<option value="saida|${esc(c.name)}">${c.emoji} ${esc(c.name)}</option>`).join("")}</optgroup>`
     + `<optgroup label="Entradas">${state.cats.entrada.map((c) => `<option value="entrada|${esc(c.name)}">${c.emoji} ${esc(c.name)}</option>`).join("")}</optgroup>`);
   keep($("#fMethod"), `<option value="">Todos os métodos</option>`
-    + ["pix", "debito", "dinheiro"].map((k) => `<option value="${k}">${METHODS[k]}</option>`).join("")
+    + ["pix", "debito", "dinheiro", "boleto"].map((k) => `<option value="${k}">${METHODS[k]}</option>`).join("")
     + (state.cards.length ? state.cards.map((c) => `<option value="card:${c.id}">💳 ${esc(c.name)}</option>`).join("") : `<option value="credito">Crédito</option>`)
     + (state.accounts.length > 1 ? `<optgroup label="Conta">${state.accounts.map((a) => `<option value="acc:${a.id}">🏦 ${esc(a.name)}</option>`).join("")}</optgroup>` : ""));
 }
@@ -741,6 +746,42 @@ function renderParcelas(c) {
      <td><div class="row-actions"><button data-edit="${r.t.id}" title="Editar compra">✏️</button><button data-del="${r.t.id}" title="Excluir compra">🗑️</button></div></td></tr>`).join("")
     + `<tr><td colspan="5"><b>Total devido (bruto)</b></td><td class="r neg"><b>${brl(c.debt)}</b></td><td></td></tr>`
     : `<tr><td colspan="7" class="empty">Nenhuma compra no crédito pendente. 🎉</td></tr>`;
+}
+
+function renderBoletos() {
+  const grupos = new Map();
+  for (const t of state.tx) {
+    if (t.method !== "boleto" || t.type !== "saida" || !t.grupo) continue;
+    if (!grupos.has(t.grupo)) grupos.set(t.grupo, []);
+    grupos.get(t.grupo).push(t);
+  }
+  const linhas = [...grupos.values()].map((list) => {
+    list.sort((a, b) => a.date.localeCompare(b.date));
+    const n = list[0].parcelas || list.length;
+    const faltam = list.filter((t) => t.date > TODAY);
+    const pagas = n - faltam.length;
+    return { list, n, pagas, faltam, next: faltam[0], falta: sum(faltam, (t) => t.value) };
+  }).filter((g) => g.faltam.length).sort((a, b) => b.falta - a.falta);
+
+  $("#boletoCard").classList.toggle("hidden", !linhas.length);
+  $("#boletoBody").innerHTML = linhas.map((g) => {
+    const t = g.next;
+    return `<tr>
+      <td class="desc">${catEmoji("saida", t.cat)} ${esc(t.desc)}</td>
+      <td>${esc(accById(t.conta).name)}</td>
+      <td>
+        <div class="prog"><span>${g.pagas}/${g.n} pagas</span><div class="mini spend"><i style="width:${(g.pagas / g.n) * 100}%"></i></div></div>
+      </td>
+      <td>${fmtDate(t.date)} <span class="muted">(${t.parcela}ª)</span></td>
+      <td class="r">${brl(t.value)}</td>
+      <td class="r neg">${brl(g.falta)}</td>
+      <td><div class="row-actions">
+        <button data-edit="${t.id}" title="Editar a próxima parcela">✏️</button>
+        <button data-boleto-reajuste="${t.grupo}" title="Mudar o valor das parcelas que faltam">💲</button>
+        <button data-boleto-del="${t.grupo}" title="Excluir as parcelas que faltam">🗑️</button>
+      </div></td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="7" class="empty">Nenhum carnê em aberto.</td></tr>`;
 }
 
 function renderRec() {
@@ -836,14 +877,33 @@ function syncFormVisibility() {
   creditOpt.hidden = creditOpt.disabled = !state.cards.length;
   if (!state.cards.length && txF.method.value === "credito") txF.method.value = "pix";
   const credit = !isIn && txF.method.value === "credito";
+  const boleto = !isIn && txF.method.value === "boleto";
+  const parcelado = (credit || boleto) && !rec;
   $("#methodLabel").classList.toggle("hidden", isIn);
-  $("#contaLabel").classList.toggle("hidden", credit || state.accounts.length < 2);
+  $("#contaLabel").classList.toggle("hidden", credit || (state.accounts.length < 2 && !boleto));
   $("#cartaoLabel").classList.toggle("hidden", !credit || state.cards.length < 2);
-  $("#parcLabel").classList.toggle("hidden", !credit || rec);
+  const noCarne = !!ui.editingGrupo;
+  $("#parcLabel").classList.toggle("hidden", !parcelado || noCarne);
+  $("#modoLabel").classList.toggle("hidden", !boleto || !parcelado || noCarne || Number(txF.parcelas.value) < 2);
 
   const v = Number(txF.value.value) || 0, n = Math.max(1, Number(txF.parcelas.value) || 1);
   const card = credit ? cardById(txF.cartao.value) : null;
   const k0 = credit && txF.date.value ? firstDueMonth(card, txF.date.value) : null;
+  if (noCarne) {
+    const g = ui.editingGrupo;
+    $("#parcHint").textContent = `Parcela ${g.parcela} de ${g.parcelas} do carnê "${g.desc}". Mudar aqui altera só esta parcela — pra mudar as que faltam, use o 💲 na aba Parcelamentos.`;
+    return;
+  }
+  if (boleto && parcelado) {
+    const n2 = Math.max(1, Number(txF.parcelas.value) || 1);
+    const total = txF.modo.value === "total" ? v : v * n2;
+    const k0b = txF.date.value ? mk(txF.date.value) : null;
+    $("#parcHint").textContent = n2 > 1 && k0b
+      ? `${n2}x de ${brl(total / n2)} · total ${brl(total)} · de ${mShort(k0b)} a ${mShort(addM(k0b, n2 - 1))}`
+        + " — cada parcela vira um gasto no mês dela, saindo da conta escolhida."
+      : "";
+    return;
+  }
   const paid = credit && !rec && k0 ? installments({ type: "saida", method: "credito", cartao: txF.cartao.value, date: txF.date.value, parcelas: n, value: v }).filter((x) => x.dueDate < TODAY).length : 0;
   $("#parcHint").textContent = credit && !rec && k0
     ? `${n > 1 ? `${n}x de ${brl(v / n)} — 1ª parcela` : "Entra"} na fatura de ${mShort(k0)} (vence ${fmtDate(dueDay(card, k0))})`
@@ -860,6 +920,7 @@ function syncFormVisibility() {
 // mode: "tx" (lançamento) ou "rec" (regra recorrente)
 function openTx(type = "saida", item = null, mode = "tx") {
   const isRec = mode === "rec";
+  ui.editingGrupo = item && !isRec && item.grupo ? item : null;
   ui.editing = item && !isRec ? item.id : null;
   ui.editingRec = item && isRec ? item.id : null;
   $("#txDialogTitle").textContent = isRec ? (item ? "Editar recorrência" : "Nova recorrência") : (item ? "Editar lançamento" : "Novo lançamento");
@@ -896,6 +957,7 @@ txForm.addEventListener("submit", (e) => {
   const type = txF.type.value;
   const method = type === "entrada" ? "pix" : txF.method.value;
   const credit = type === "saida" && method === "credito";
+  const boleto = type === "saida" && method === "boleto";
   const rec = txF.recorrente.checked;
   const data = {
     type,
@@ -908,6 +970,28 @@ txForm.addEventListener("submit", (e) => {
     ...(credit ? { cartao: txF.cartao.value } : { conta: txF.conta.value }),
   };
   if (!data.desc || !(data.value > 0) || !data.date) return;
+
+  // Carnê/boleto parcelado: cria um lançamento por mês, com a parcela caindo no mês dela
+  if (boleto && !rec && !ui.editing) {
+    const n = Math.max(1, Math.min(240, Number(txF.parcelas.value) || 1));
+    if (n > 1) {
+      const total = round2(txF.modo.value === "total" ? data.value : data.value * n);
+      const base = round2(total / n);
+      const grupo = uid();
+      const k0 = mk(data.date), dia = Number(data.date.slice(8));
+      for (let i = 0; i < n; i++) {
+        const k = addM(k0, i);
+        state.tx.push({ ...data, id: uid(), grupo, parcela: i + 1, parcelas: n,
+          value: i === n - 1 ? round2(total - base * (n - 1)) : base,
+          date: `${k}-${pad(Math.min(dia, daysIn(k)))}` });
+      }
+      ui.month = k0 <= CUR ? k0 : ui.month;
+      normalizeRefs();
+      txDialog.close();
+      refresh();
+      return;
+    }
+  }
 
   if (rec) {
     const fim = parseMonth(txF.fim.value);
@@ -927,8 +1011,9 @@ txForm.addEventListener("submit", (e) => {
     runRecurring();
   } else if (ui.editing) {
     const t = state.tx.find((x) => x.id === ui.editing);
+    const doCarne = t.grupo ? { grupo: t.grupo, parcela: t.parcela, parcelas: t.parcelas } : {};
     delete t.conta; delete t.cartao;
-    Object.assign(t, data);
+    Object.assign(t, data, doCarne);
   } else {
     state.tx.push({ id: uid(), ...data });
   }
@@ -950,6 +1035,26 @@ function onTxAction(e) {
   }
 }
 $("#txBody").addEventListener("click", onTxAction);
+$("#boletoBody").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-boleto-del], [data-boleto-reajuste]");
+  if (!btn) return onTxAction(e);
+  const grupo = btn.dataset.boletoDel || btn.dataset.boletoReajuste;
+  const futuras = state.tx.filter((t) => t.grupo === grupo && t.date > TODAY).sort((a, b) => a.date.localeCompare(b.date));
+  if (!futuras.length) return;
+  if (btn.dataset.boletoDel) {
+    if (!confirm(`Excluir as ${futuras.length} parcelas que ainda não venceram de "${futuras[0].desc}"? As já pagas continuam.`)) return;
+    const ids = new Set(futuras.map((t) => t.id));
+    state.tx = state.tx.filter((t) => !ids.has(t.id));
+  } else {
+    const atual = futuras[0].value;
+    const resposta = prompt(`Novo valor para as ${futuras.length} parcelas que faltam de "${futuras[0].desc}" (a atual é ${brl(atual)}):`, String(atual).replace(".", ","));
+    if (resposta === null) return;
+    const novo = round2(Number(String(resposta).replace(/\./g, "").replace(",", ".")));
+    if (!(novo > 0)) { alert("Valor inválido."); return; }
+    futuras.forEach((t) => { t.value = novo; });
+  }
+  refresh();
+});
 $("#parcBody").addEventListener("click", onTxAction);
 
 $("#btnNewRec").addEventListener("click", () => openTx("saida", null, "rec"));
