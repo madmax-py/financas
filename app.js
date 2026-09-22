@@ -884,7 +884,9 @@ function syncFormVisibility() {
   $("#cartaoLabel").classList.toggle("hidden", !credit || state.cards.length < 2);
   const noCarne = !!ui.editingGrupo;
   $("#parcLabel").classList.toggle("hidden", !parcelado || noCarne);
-  $("#modoLabel").classList.toggle("hidden", !boleto || !parcelado || noCarne || Number(txF.parcelas.value) < 2);
+  const nParc = Number(txF.parcelas.value) || 1;
+  $("#modoLabel").classList.toggle("hidden", !boleto || !parcelado || noCarne || nParc < 2);
+  $("#pagasLabel").classList.toggle("hidden", !boleto || !parcelado || noCarne || nParc < 2);
 
   const v = Number(txF.value.value) || 0, n = Math.max(1, Number(txF.parcelas.value) || 1);
   const card = credit ? cardById(txF.cartao.value) : null;
@@ -895,11 +897,14 @@ function syncFormVisibility() {
     return;
   }
   if (boleto && parcelado) {
-    const n2 = Math.max(1, Number(txF.parcelas.value) || 1);
+    const n2 = Math.max(1, nParc);
+    const pagas = Math.max(0, Math.min(n2 - 1, Number(txF.pagas.value) || 0));
     const total = txF.modo.value === "total" ? v : v * n2;
     const k0b = txF.date.value ? mk(txF.date.value) : null;
     $("#parcHint").textContent = n2 > 1 && k0b
-      ? `${n2}x de ${brl(total / n2)} · total ${brl(total)} · de ${mShort(k0b)} a ${mShort(addM(k0b, n2 - 1))}`
+      ? `${n2}x de ${brl(total / n2)}`
+        + (pagas ? ` · registrando da ${pagas + 1}ª à ${n2}ª (${n2 - pagas} parcelas, ${brl((total / n2) * (n2 - pagas))})` : ` · total ${brl(total)}`)
+        + ` · de ${mShort(k0b)} a ${mShort(addM(k0b, n2 - pagas - 1))}`
         + " — cada parcela vira um gasto no mês dela, saindo da conta escolhida."
       : "";
     return;
@@ -975,12 +980,14 @@ txForm.addEventListener("submit", (e) => {
   if (boleto && !rec && !ui.editing) {
     const n = Math.max(1, Math.min(240, Number(txF.parcelas.value) || 1));
     if (n > 1) {
+      const pagas = Math.max(0, Math.min(n - 1, Number(txF.pagas.value) || 0));
       const total = round2(txF.modo.value === "total" ? data.value : data.value * n);
       const base = round2(total / n);
       const grupo = uid();
+      // a data informada é a da PRÓXIMA parcela a registrar; as já pagas não viram lançamento
       const k0 = mk(data.date), dia = Number(data.date.slice(8));
-      for (let i = 0; i < n; i++) {
-        const k = addM(k0, i);
+      for (let i = pagas; i < n; i++) {
+        const k = addM(k0, i - pagas);
         state.tx.push({ ...data, id: uid(), grupo, parcela: i + 1, parcelas: n,
           value: i === n - 1 ? round2(total - base * (n - 1)) : base,
           date: `${k}-${pad(Math.min(dia, daysIn(k)))}` });
