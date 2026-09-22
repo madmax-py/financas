@@ -20,6 +20,11 @@
     </form>
   </div>
 
+  <!-- ARRASTAR E SOLTAR -->
+  <div class="dropzone hidden" id="dropzone">
+    <div class="dropzone-box">⬆<br>Solte aqui o extrato (CSV ou OFX)<br><span class="muted small-text">ou um backup .json pra restaurar</span></div>
+  </div>
+
   <!-- ALERTAS -->
   <div class="alerts" id="alerts"></div>
 
@@ -359,11 +364,12 @@
   <dialog id="impDialog" class="wide">
     <form id="impForm" class="form">
       <h3>Importar extrato</h3>
-      <p class="muted small-text">Aceita CSV (Nubank, Inter, planilhas…) e OFX, que a maioria dos bancos exporta. O arquivo é lido só aqui no seu navegador.</p>
+      <p class="muted small-text">Aceita CSV (Nubank, PicPay, Inter, planilhas…) e OFX, que a maioria dos bancos exporta. Dá pra arrastar o arquivo pra cima da página, de qualquer tela. O arquivo é lido só aqui no seu navegador.</p>
       <div class="row">
         <label>Arquivo<input type="file" id="impFile" class="input" accept=".csv,.ofx,.txt,text/csv"></label>
         <label>Destino<select id="impDest" class="select"></select></label>
       </div>
+      <p class="detected small-text" id="impDetected"></p>
       <div class="row hidden" id="impMap">
         <label>Coluna da data<select id="impColDate" class="select"></select></label>
         <label>Coluna da descrição<select id="impColDesc" class="select"></select></label>

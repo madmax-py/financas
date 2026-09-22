@@ -396,3 +396,12 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-si
 .login-box p { margin: 0; }
 .login-icon { font-size: 34px; }
 .login-err { color: var(--spend); font-size: 13px; min-height: 18px; }
+
+/* arrastar e soltar */
+.dropzone { position: fixed; inset: 0; z-index: 200; background: rgba(0, 0, 0, 0.75); display: grid; place-items: center; padding: 24px; }
+.dropzone-box {
+  border: 2px dashed var(--accent-strong); border-radius: 12px; padding: 48px 40px; text-align: center;
+  font-size: 18px; line-height: 1.8; background: var(--panel); pointer-events: none;
+}
+.detected { color: var(--text); background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; margin: 0; }
+.detected:empty { display: none; }

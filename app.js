@@ -1237,31 +1237,109 @@ async function readFileText(file) {
   return utf.includes("�") ? new TextDecoder("iso-8859-1").decode(buf) : utf;
 }
 
-$("#impFile").addEventListener("change", async (e) => {
-  const file = e.target.files[0];
+const slug = (x) => String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+const BANCOS = ["nubank", "picpay", "inter", "itau", "bradesco", "santander", "caixa", "c6", "mercado pago", "neon", "next", "original", "will", "banco do brasil", "sicredi", "sicoob", "banrisul", "pagbank", "paypal"];
+
+// Descobre pelo arquivo se é fatura de cartão ou extrato de conta, e pra onde mandar
+function detectSource(file, text, table) {
+  const nome = slug(file.name), head = slug((text.split(/\r?\n/)[0] || "").slice(0, 200));
+  const banco = BANCOS.find((b) => nome.includes(b) || head.includes(b) || slug(text.slice(0, 4000)).includes(b)) || null;
+
+  let cartao = null; // true = fatura de cartão, false = extrato de conta, null = não sei
+  if (/<OFX>|<STMTTRN>/i.test(text)) {
+    if (/<CREDITCARDMSGSRSV1>|<CCSTMTRS>/i.test(text)) cartao = true;
+    else if (/<BANKMSGSRSV1>|<STMTRS>/i.test(text)) cartao = false;
+  } else if (/\bdate\b/.test(head) && /\btitle\b/.test(head) && /\bamount\b/.test(head)) {
+    cartao = true; // layout da fatura do Nubank
+  } else if (/fatura|invoice|cartao|credito/.test(nome)) cartao = true;
+  else if (/extrato|conta|statement|account/.test(nome)) cartao = false;
+
+  // Na dúvida num CSV, olha o sinal dos valores: fatura tem quase tudo positivo
+  if (cartao === null && table) {
+    const vals = table.data.slice(0, 40).map((r) => parseAmount(r[table.vc])).filter((v) => v !== null && v !== 0);
+    if (vals.length >= 3) cartao = vals.filter((v) => v > 0).length / vals.length > 0.8;
+  }
+
+  // Destino: tenta casar o nome do banco com o nome dos seus cartões/contas
+  const destinos = [
+    ...state.cards.map((c) => ({ v: `card:${c.id}`, nome: slug(c.name), cartao: true, label: c.name })),
+    ...state.accounts.map((a) => ({ v: `acc:${a.id}`, nome: slug(a.name), cartao: false, label: a.name })),
+  ];
+  const combina = (d) => (banco && (d.nome.includes(banco) || banco.includes(d.nome))) || (nome && d.nome.split(" ").some((w) => w.length >= 4 && nome.includes(w)));
+  const achado = destinos.find((d) => d.cartao === cartao && combina(d)) || destinos.find((d) => combina(d));
+  const dest = achado
+    || (cartao === true ? destinos.find((d) => d.cartao) : null)
+    || (cartao === false ? destinos.find((d) => !d.cartao) : null);
+  return { banco, cartao, dest, certo: !!achado };
+}
+
+async function handleImportFile(file) {
   if (!file) return;
   const text = await readFileText(file);
-  if (/<OFX>|<STMTTRN>/i.test(text)) {
+  const ofx = /<OFX>|<STMTTRN>/i.test(text);
+  let table = null;
+  if (ofx) {
     imp = { kind: "ofx", raw: parseOFX(text) };
     $("#impMap").classList.add("hidden");
     $("#impSignRow").classList.add("hidden");
   } else {
-    const table = parseCSV(text);
-    if (table.length < 1) { alert("Não achei linhas nesse arquivo."); return; }
-    const map = autoMapCSV(table);
-    imp = { kind: "csv", ...map };
-    const opts = [...Array(map.cols).keys()].map((i) => `<option value="${i}">${esc(map.header?.[i] || `Coluna ${i + 1}`)}</option>`).join("");
-    for (const [sel, v] of [["#impColDate", map.dc], ["#impColDesc", map.sc], ["#impColVal", map.vc]]) { $(sel).innerHTML = opts; $(sel).value = v; }
+    const rows = parseCSV(text);
+    if (!rows.length) { alert("Não achei linhas nesse arquivo."); return; }
+    table = autoMapCSV(rows);
+    imp = { kind: "csv", ...table };
+    const opts = [...Array(table.cols).keys()].map((i) => `<option value="${i}">${esc(table.header?.[i] || `Coluna ${i + 1}`)}</option>`).join("");
+    for (const [sel, v] of [["#impColDate", table.dc], ["#impColDesc", table.sc], ["#impColVal", table.vc]]) { $(sel).innerHTML = opts; $(sel).value = v; }
     $("#impMap").classList.remove("hidden");
     $("#impSignRow").classList.remove("hidden");
-    $("#impPositiveSpend").checked = $("#impDest").value.startsWith("card:");
   }
+
+  const { banco, cartao, dest, certo } = detectSource(file, text, table);
+  if (dest) $("#impDest").value = dest.v;
+  if (!ofx) $("#impPositiveSpend").checked = $("#impDest").value.startsWith("card:");
+  const tipo = cartao === true ? "fatura de cartão" : cartao === false ? "extrato de conta" : null;
+  const nomeBanco = banco ? `<b>${esc(banco.replace(/(^|\s)\w/g, (c) => c.toUpperCase()))}</b>` : null;
+  $("#impDetected").innerHTML = banco || tipo
+    ? `🔎 Detectei ${[nomeBanco, tipo].filter(Boolean).join(" · ")}`
+      + (certo ? ` → vai pra <b>${esc(dest.label)}</b>. Se não for isso, troque acima.`
+        : dest ? `. Não achei ${cartao ? "cartão" : "conta"} com esse nome, então escolhi <b>${esc(dest.label)}</b> — confira o destino acima.`
+        : ". Escolha o destino acima.")
+    : "";
   buildImportItems();
-});
+}
+
+$("#impFile").addEventListener("change", (e) => { handleImportFile(e.target.files[0]); });
 ["#impColDate", "#impColDesc", "#impColVal", "#impPositiveSpend"].forEach((s) => $(s).addEventListener("change", buildImportItems));
 $("#impDest").addEventListener("change", () => {
   if (imp?.kind === "csv") $("#impPositiveSpend").checked = $("#impDest").value.startsWith("card:");
   buildImportItems();
+});
+
+// ----- Arrastar e soltar o extrato em qualquer lugar da página -----
+let dragDepth = 0;
+const isFileDrag = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
+window.addEventListener("dragenter", (e) => {
+  if (!isFileDrag(e)) return;
+  e.preventDefault();
+  if (++dragDepth === 1) $("#dropzone").classList.remove("hidden");
+});
+window.addEventListener("dragover", (e) => { if (isFileDrag(e)) e.preventDefault(); });
+window.addEventListener("dragleave", (e) => { if (isFileDrag(e) && --dragDepth <= 0) { dragDepth = 0; $("#dropzone").classList.add("hidden"); } });
+window.addEventListener("drop", async (e) => {
+  if (!isFileDrag(e)) return;
+  e.preventDefault();
+  dragDepth = 0;
+  $("#dropzone").classList.add("hidden");
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  if (/\.json$/i.test(file.name)) {
+    if (!confirm(`Restaurar o backup "${file.name}"? Isso substitui TODOS os dados atuais.`)) return;
+    return restoreBackup(file);
+  }
+  if (!/\.(csv|ofx|txt)$/i.test(file.name)) { alert("Solte um extrato em CSV ou OFX (ou um backup .json)."); return; }
+  $$("dialog[open]").forEach((d) => d.close());
+  openImport();
+  $("#impFile").value = "";
+  await handleImportFile(file);
 });
 
 function buildImportItems() {
@@ -1390,9 +1468,7 @@ $("#btnExport").addEventListener("click", () => {
   a.click();
   URL.revokeObjectURL(a.href);
 });
-$("#importInput").addEventListener("change", async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
+async function restoreBackup(file) {
   try {
     const data = JSON.parse(await file.text());
     if (!Array.isArray(data.tx) || !data.profile) throw new Error();
@@ -1400,7 +1476,10 @@ $("#importInput").addEventListener("change", async (e) => {
     ui.recCreated = runRecurring();
     setDialog.close();
     refresh();
-  } catch { alert("Arquivo inválido."); }
+  } catch { alert("Arquivo inválido: esperava um JSON exportado por este app."); }
+}
+$("#importInput").addEventListener("change", async (e) => {
+  if (e.target.files[0]) await restoreBackup(e.target.files[0]);
   e.target.value = "";
 });
 $("#btnReset").addEventListener("click", () => {
