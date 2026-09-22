@@ -301,8 +301,12 @@ function virtualRec(horizon) {
 }
 
 // ===== Cálculos =====
+const futuro = (M) => M > CUR;
+// Num mês que ainda não chegou, mostra também as recorrências que vão acontecer nele
+const previstosDoMes = (M) => (futuro(M) ? virtualRec(M).filter((t) => mk(t.date) === M) : []);
+
 function monthSums(M) {
-  const tx = state.tx.filter((t) => mk(t.date) === M);
+  const tx = [...state.tx.filter((t) => mk(t.date) === M), ...previstosDoMes(M)];
   const outs = tx.filter((t) => t.type === "saida"), ins = tx.filter((t) => t.type === "entrada");
   const byCat = Object.fromEntries(state.cats.saida.map((c) => [c.name, 0]));
   outs.forEach((t) => { byCat[t.cat] = (byCat[t.cat] || 0) + t.value; });
@@ -593,7 +597,7 @@ function renderRight(c, m, prev) {
   }).join("");
   $("#faturasFoot").textContent = six.some((f) => f.p) ? "~ inclui gastos recorrentes no crédito previstos" : "";
 
-  $("#resumoTitle").textContent = `📋 Resumo de ${mLabel(ui.month)}`;
+  $("#resumoTitle").textContent = `📋 Resumo de ${mLabel(ui.month)}${futuro(ui.month) ? " (previsto)" : ""}`;
   const res = m.entM - m.saiM, pres = prev.entM - prev.saiM;
   const elapsed = ui.month === CUR ? Number(TODAY.slice(8)) : daysIn(ui.month);
   const biggest = m.outs.reduce((a, t) => (!a || t.value > a.value ? t : a), null);
@@ -614,6 +618,10 @@ function renderRight(c, m, prev) {
 }
 
 function renderCharts(c, m, prev) {
+  const prevs = previstosDoMes(ui.month);
+  $("#radarFoot").innerHTML = prevs.length
+    ? `🔮 Inclui ${prevs.length} recorrência(s) prevista(s) para ${mName(ui.month).toLowerCase()} · tracejado = orçamento`
+    : "✦ Gastos por categoria · tracejado = orçamento";
   radar.data.labels = state.cats.saida.map((x) => x.name);
   radar.data.datasets[0].data = state.cats.saida.map((x) => m.byCat[x.name] || 0);
   const hasBudget = state.cats.saida.some((x) => x.budget);
@@ -707,7 +715,8 @@ function renderTable() {
     if (meth.startsWith("acc:")) return t.method !== "credito" && t.conta === meth.slice(4);
     return t.type === "saida" && t.method === meth;
   };
-  const rows = state.tx.filter((t) =>
+  const base = scope === "todos" ? state.tx : [...state.tx, ...previstosDoMes(ui.month)];
+  const rows = base.filter((t) =>
     (scope === "todos" || mk(t.date) === ui.month) && (!type || t.type === type) && (!q || t.desc.toLowerCase().includes(q))
     && (!cat || `${t.type}|${t.cat}` === cat) && matchMethod(t) && t.value >= min && t.value <= max);
 
@@ -723,11 +732,12 @@ function renderTable() {
     const isIn = t.type === "entrada";
     return `<tr>
       <td>${fmtDate(t.date)}</td>
-      <td class="desc">${esc(t.desc)}${t.recId ? `<span class="rec-icon" title="Gerado por recorrência">🔁</span>` : ""}${t.fitid || t.imported ? `<span class="rec-icon" title="Importado de extrato">⬆</span>` : ""}</td>
+      <td class="desc">${esc(t.desc)}${t.virtual ? `<span class="rec-icon" title="Ainda não aconteceu: previsão pela recorrência">🔮</span>` : t.recId ? `<span class="rec-icon" title="Gerado por recorrência">🔁</span>` : ""}${t.fitid || t.imported ? `<span class="rec-icon" title="Importado de extrato">⬆</span>` : ""}</td>
       <td>${catEmoji(t.type, t.cat)} ${esc(t.cat)}</td>
       <td>${isIn && state.accounts.length < 2 ? "—" : `<span class="tag ${t.method}">${esc(methodLabel(t))}</span>`}</td>
       <td class="r ${isIn ? "pos" : "neg"}">${isIn ? "+" : "−"} ${brl(t.value)}</td>
-      <td><div class="row-actions"><button data-edit="${t.id}" title="Editar">✏️</button><button data-del="${t.id}" title="Excluir">🗑️</button></div></td>
+      <td><div class="row-actions">${t.virtual ? `<span class="muted small-text">previsto</span>`
+        : `<button data-edit="${t.id}" title="Editar">✏️</button><button data-del="${t.id}" title="Excluir">🗑️</button>`}</div></td>
     </tr>`;
   }).join("") : `<tr><td colspan="6" class="empty">Nenhum lançamento encontrado.</td></tr>`;
 }
