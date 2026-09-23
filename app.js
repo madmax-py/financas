@@ -1812,7 +1812,7 @@ const TELA_KEY = "financas.tela";
 const chartsDaTela = { geral: () => [radar, line, yearChart], parc: () => [bar].filter(Boolean) };
 function mostrarTela(tab) {
   const primeiraVezNoParc = tab === "parc" && !bar;
-  $$("#mainTabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
+  $$("#mainTabs .tab, .drawer-item").forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
   $$(".panel").forEach((p) => p.classList.toggle("hidden", p.id !== `tab-${tab}`));
   $("#telas").classList.toggle("hidden", tab === "geral");
   window.scrollTo({ top: 0 });
@@ -1827,6 +1827,21 @@ $("#mainTabs").addEventListener("click", (e) => {
   const b = e.target.closest(".tab");
   if (b) mostrarTela(b.dataset.tab);
 });
+
+// No celular as abas viram um menu lateral, montado a partir das mesmas abas
+const drawer = $("#drawer"), drawerBg = $("#drawerBg");
+$("#drawerNav").innerHTML = $$("#mainTabs .tab")
+  .map((b) => `<button class="drawer-item" data-tab="${b.dataset.tab}">${esc(b.textContent.trim())}</button>`).join("");
+const abrirMenu = (abrir) => { drawer.classList.toggle("open", abrir); drawerBg.classList.toggle("open", abrir); };
+$("#btnMenu").addEventListener("click", () => abrirMenu(!drawer.classList.contains("open")));
+drawerBg.addEventListener("click", () => abrirMenu(false));
+$("#drawerNav").addEventListener("click", (e) => {
+  const b = e.target.closest(".drawer-item");
+  if (!b) return;
+  mostrarTela(b.dataset.tab);
+  abrirMenu(false);
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") abrirMenu(false); });
 
 ["#fSearch", "#fType", "#fScope", "#fCat", "#fMethod", "#fMin", "#fMax"].forEach((s) => $(s).addEventListener("input", renderTable));
 $("#fClear").addEventListener("click", () => {
