@@ -430,19 +430,26 @@ const yearChart = new Chart($("#yearChart"), {
   },
 });
 
-const bar = new Chart($("#barChart"), {
-  type: "bar",
-  data: { labels: [], datasets: [
-    { label: "Fatura", data: [], backgroundColor: SPEND_FILL, borderColor: SPEND, borderWidth: 1, borderRadius: 4, stack: "f" },
-    { label: "Previsto (recorrentes)", data: [], backgroundColor: "rgba(229, 72, 77, 0.18)", borderColor: SPEND, borderWidth: 1, borderDash: [3, 3], borderRadius: 4, stack: "f" },
-  ] },
-  options: {
-    maintainAspectRatio: false,
-    interaction: { mode: "index", intersect: false },
-    plugins: { legend, tooltip },
-    scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, ticks: { callback: kfmt } } },
-  },
-});
+// Criado só quando a tela de Parcelamentos aparece: um gráfico criado dentro de uma
+// tela escondida nasce com largura zero e não se recupera sozinho.
+let bar = null;
+function criarGraficoFaturas() {
+  if (bar) return bar;
+  bar = new Chart($("#barChart"), {
+    type: "bar",
+    data: { labels: [], datasets: [
+      { label: "Fatura", data: [], backgroundColor: SPEND_FILL, borderColor: SPEND, borderWidth: 1, borderRadius: 4, stack: "f" },
+      { label: "Previsto (recorrentes)", data: [], backgroundColor: "rgba(229, 72, 77, 0.18)", borderColor: SPEND, borderWidth: 1, borderDash: [3, 3], borderRadius: 4, stack: "f" },
+    ] },
+    options: {
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: { legend, tooltip },
+      scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, ticks: { callback: kfmt } } },
+    },
+  });
+  return bar;
+}
 
 // ===== Render =====
 function render() {
@@ -666,10 +673,12 @@ function renderCharts(c, m, prev) {
   }
   yearChart.update();
 
-  bar.data.labels = c.faturas.map((x) => mShort(x.k));
-  bar.data.datasets[0].data = c.faturas.map((x) => x.v);
-  bar.data.datasets[1].data = c.faturas.map((x) => x.p);
-  bar.update();
+  if (bar) {
+    bar.data.labels = c.faturas.map((x) => mShort(x.k));
+    bar.data.datasets[0].data = c.faturas.map((x) => x.v);
+    bar.data.datasets[1].data = c.faturas.map((x) => x.p);
+    bar.update();
+  }
 }
 
 function renderCompare(m, prev) {
@@ -1799,13 +1808,26 @@ const tabGroup = (sel, key) => $(sel).addEventListener("click", (e) => {
 });
 tabGroup("#lineTabs", "lineMode");
 tabGroup("#yearTabs", "yearMode");
-$("#bottomTabs").addEventListener("click", (e) => {
+const TELA_KEY = "financas.tela";
+const chartsDaTela = { geral: () => [radar, line, yearChart], parc: () => [bar].filter(Boolean) };
+function mostrarTela(tab) {
+  const primeiraVezNoParc = tab === "parc" && !bar;
+  $$("#mainTabs .tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === tab));
+  $$(".panel").forEach((p) => p.classList.toggle("hidden", p.id !== `tab-${tab}`));
+  $("#telas").classList.toggle("hidden", tab === "geral");
+  window.scrollTo({ top: 0 });
+  requestAnimationFrame(() => {
+    if (primeiraVezNoParc) { criarGraficoFaturas(); render(); return; }
+    // gráficos que estavam escondidos precisam se redimensionar ao aparecer
+    (chartsDaTela[tab]?.() || []).forEach((ch) => { ch.resize(); ch.update(); });
+  });
+  try { localStorage.setItem(TELA_KEY, tab); } catch {}
+}
+$("#mainTabs").addEventListener("click", (e) => {
   const b = e.target.closest(".tab");
-  if (!b) return;
-  $$("#bottomTabs .tab").forEach((t) => t.classList.toggle("active", t === b));
-  $$(".panel").forEach((p) => p.classList.toggle("hidden", p.id !== `tab-${b.dataset.tab}`));
-  if (b.dataset.tab === "parc") requestAnimationFrame(() => { bar.resize(); bar.reset(); bar.update(); });
+  if (b) mostrarTela(b.dataset.tab);
 });
+
 ["#fSearch", "#fType", "#fScope", "#fCat", "#fMethod", "#fMin", "#fMax"].forEach((s) => $(s).addEventListener("input", renderTable));
 $("#fClear").addEventListener("click", () => {
   ["#fSearch", "#fType", "#fCat", "#fMethod", "#fMin", "#fMax"].forEach((s) => { $(s).value = ""; });
@@ -1825,4 +1847,7 @@ $$("th.sortable").forEach((th) => th.addEventListener("click", () => {
   renderMonthSelect();
   renderFilterOptions();
   render();
+  let telaInicial = "geral";
+  try { telaInicial = localStorage.getItem(TELA_KEY) || "geral"; } catch {}
+  if ($(`#tab-${telaInicial}`)) mostrarTela(telaInicial);
 })();

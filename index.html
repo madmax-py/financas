@@ -25,16 +25,33 @@
     <div class="dropzone-box">⬆<br>Solte aqui o extrato (CSV ou OFX)<br><span class="muted small-text">ou um backup .json pra restaurar</span></div>
   </div>
 
+  <!-- BARRA SUPERIOR -->
+  <header class="topbar">
+    <div class="brand">💰 <span>Minhas Finanças</span></div>
+    <nav class="tabs main-tabs" id="mainTabs">
+      <button class="tab active" data-tab="geral">📊 Visão geral</button>
+      <button class="tab" data-tab="lanc">🧾 Lançamentos</button>
+      <button class="tab" data-tab="parc">💳 Parcelamentos</button>
+      <button class="tab" data-tab="rec">🔁 Recorrentes</button>
+      <button class="tab" data-tab="metas">🎯 Metas</button>
+      <button class="tab" data-tab="cats">🗂️ Categorias</button>
+    </nav>
+    <div class="topbar-right">
+      <select id="monthSel" class="select" title="Mês em foco"></select>
+      <button class="icon-btn" id="btnSettings" title="Configurações">⚙</button>
+    </div>
+  </header>
+
   <!-- ALERTAS -->
   <div class="alerts" id="alerts"></div>
 
+  <div class="panel" id="tab-geral">
   <main class="grid">
     <!-- ESQUERDA -->
     <aside class="col">
       <div class="card profile">
         <div class="profile-top">
           <span class="rank-chip">💰 <span id="rankLabel">—</span></span>
-          <button class="icon-btn" id="btnSettings" title="Configurações">⚙</button>
         </div>
         <label class="photo" title="Trocar foto">
           <img id="photo" alt="">
@@ -60,7 +77,6 @@
       <div class="card">
         <div class="card-head title-row">
           <span class="page-title">Visão do mês</span>
-          <select id="monthSel" class="select"></select>
         </div>
         <div class="chart-box radar-box"><canvas id="radarChart"></canvas></div>
         <div class="chart-foot" id="radarFoot">✦ Gastos por categoria · tracejado = orçamento</div>
@@ -126,19 +142,12 @@
       </div>
     </aside>
   </main>
+  </div>
 
-  <!-- INFERIOR -->
-  <section class="bottom">
-    <h2 class="pursuits">« Seus Lançamentos »</h2>
-    <div class="tabs" id="bottomTabs">
-      <button class="tab active" data-tab="lanc">🧾 Lançamentos</button>
-      <button class="tab" data-tab="parc">💳 Parcelamentos</button>
-      <button class="tab" data-tab="rec">🔁 Recorrentes</button>
-      <button class="tab" data-tab="metas">🎯 Metas</button>
-      <button class="tab" data-tab="cats">🗂️ Categorias</button>
-    </div>
+  <!-- TELAS -->
+  <section class="bottom hidden" id="telas">
 
-    <div class="panel" id="tab-lanc">
+    <div class="panel hidden" id="tab-lanc"><h2 class="screen-title">🧾 Lançamentos</h2>
       <div class="filters">
         <input id="fSearch" class="input grow" placeholder="🔎 Buscar descrição…">
         <select id="fType" class="select">
@@ -176,7 +185,7 @@
       </div>
     </div>
 
-    <div class="panel hidden" id="tab-parc">
+    <div class="panel hidden" id="tab-parc"><h2 class="screen-title">💳 Parcelamentos</h2>
       <div class="card inner" id="boletoCard">
         <div class="card-head">🧾 Carnês e boletos parcelados</div>
         <div class="table-wrap">
@@ -198,7 +207,7 @@
       </div>
     </div>
 
-    <div class="panel hidden" id="tab-rec">
+    <div class="panel hidden" id="tab-rec"><h2 class="screen-title">🔁 Recorrentes</h2>
       <div class="filters">
         <div class="rec-summary" id="recSummary"></div>
         <button class="btn primary" id="btnNewRec">＋ Nova recorrência</button>
@@ -212,7 +221,7 @@
       <p class="muted small-text">Os lançamentos são criados sozinhos quando o dia chega (ou na próxima vez que você abrir o app). Depois de criados, viram lançamentos normais: dá pra editar ou excluir cada um sem mexer na regra. As próximas ocorrências já entram na previsão e nas faturas futuras.</p>
     </div>
 
-    <div class="panel hidden" id="tab-metas">
+    <div class="panel hidden" id="tab-metas"><h2 class="screen-title">🎯 Metas</h2>
       <div class="filters">
         <div class="rec-summary" id="goalSummary"></div>
         <button class="btn primary" id="btnNewGoal">＋ Nova meta</button>
@@ -220,7 +229,7 @@
       <div class="cat-cards" id="goalCards"></div>
     </div>
 
-    <div class="panel hidden" id="tab-cats">
+    <div class="panel hidden" id="tab-cats"><h2 class="screen-title">🗂️ Categorias</h2>
       <div class="filters">
         <div class="rec-summary" id="catSummary"></div>
         <button class="btn ghost" data-open="cats">✏️ Gerenciar categorias</button>
