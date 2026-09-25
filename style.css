@@ -474,3 +474,28 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-si
   }
   .drawer-bg.open { opacity: 1; pointer-events: auto; }
 }
+
+/* ===== ícones (Tabler webfont) ===== */
+.ti { font-size: 1.15em; line-height: 1; vertical-align: -0.16em; }
+.emo { font-size: 1.05em; line-height: 1; }
+.tab .ti, .btn .ti, .drawer-item .ti, .card-head .ti, .screen-title .ti, .bar-label .ti { font-size: 1.05em; }
+.icon-btn .ti { font-size: 15px; vertical-align: -0.08em; }
+.login-icon .ti { font-size: 34px; }
+.dropzone-box .ti { font-size: 32px; }
+.debt-icon .ti { font-size: 24px; color: var(--spend); }
+.cat-banner .ti { font-size: 34px; color: var(--text); opacity: 0.92; }
+.goal-emoji .ti { font-size: 22px; }
+.screen-title .ti, .page-title .ti { vertical-align: -0.12em; }
+.rec-icon .ti { font-size: 12px; }
+.row-actions .ti { font-size: 15px; vertical-align: -0.15em; }
+.table td .ti, .list .ti { color: var(--muted); }
+.stat-top .ti { color: var(--muted); }
+/* pré-visualização do ícone nos formulários */
+.ico-prev {
+  width: 34px; height: 34px; flex: none; display: grid; place-items: center;
+  border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2);
+}
+.ico-prev .ti { font-size: 18px; }
+.ico-prev .emo { font-size: 17px; }
+.input.emoji { width: 150px; text-align: left; font-size: 12.5px; }
+.emoji-field { flex: 0 0 150px !important; }

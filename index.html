@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Minhas Finanças</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.48.0/dist/tabler-icons.min.css">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
@@ -11,7 +12,7 @@
   <!-- LOGIN (só aparece na versão hospedada, ex.: Vercel) -->
   <div class="login hidden" id="login">
     <form class="login-box" id="loginForm">
-      <div class="login-icon">💰</div>
+      <div class="login-icon"><i class="ti ti-wallet"></i></div>
       <h2>Minhas Finanças</h2>
       <p class="muted small-text">Digite sua senha pra acessar.</p>
       <input type="password" id="loginPass" class="input" placeholder="Senha" autocomplete="current-password" required>
@@ -22,31 +23,31 @@
 
   <!-- ARRASTAR E SOLTAR -->
   <div class="dropzone hidden" id="dropzone">
-    <div class="dropzone-box">⬆<br>Solte aqui o extrato (CSV ou OFX)<br><span class="muted small-text">ou um backup .json pra restaurar</span></div>
+    <div class="dropzone-box"><i class="ti ti-upload"></i><br>Solte aqui o extrato (CSV ou OFX)<br><span class="muted small-text">ou um backup .json pra restaurar</span></div>
   </div>
 
   <!-- BARRA SUPERIOR -->
   <!-- MENU LATERAL (celular) -->
   <div class="drawer-bg" id="drawerBg"></div>
   <aside class="drawer" id="drawer">
-    <div class="drawer-head">💰 Minhas Finanças</div>
+    <div class="drawer-head"><i class="ti ti-wallet"></i> Minhas Finanças</div>
     <nav id="drawerNav"></nav>
   </aside>
 
   <header class="topbar">
-    <button class="icon-btn menu-btn" id="btnMenu" title="Menu" aria-label="Abrir menu">☰</button>
-    <div class="brand">💰 <span>Minhas Finanças</span></div>
+    <button class="icon-btn menu-btn" id="btnMenu" title="Menu" aria-label="Abrir menu"><i class="ti ti-menu-2"></i></button>
+    <div class="brand"><i class="ti ti-wallet"></i> <span>Minhas Finanças</span></div>
     <nav class="tabs main-tabs" id="mainTabs">
-      <button class="tab active" data-tab="geral">📊 Visão geral</button>
-      <button class="tab" data-tab="lanc">🧾 Lançamentos</button>
-      <button class="tab" data-tab="parc">💳 Parcelamentos</button>
-      <button class="tab" data-tab="rec">🔁 Recorrentes</button>
-      <button class="tab" data-tab="metas">🎯 Metas</button>
-      <button class="tab" data-tab="cats">🗂️ Categorias</button>
+      <button class="tab active" data-tab="geral"><i class="ti ti-layout-dashboard"></i> Visão geral</button>
+      <button class="tab" data-tab="lanc"><i class="ti ti-receipt-2"></i> Lançamentos</button>
+      <button class="tab" data-tab="parc"><i class="ti ti-credit-card"></i> Parcelamentos</button>
+      <button class="tab" data-tab="rec"><i class="ti ti-repeat"></i> Recorrentes</button>
+      <button class="tab" data-tab="metas"><i class="ti ti-target-arrow"></i> Metas</button>
+      <button class="tab" data-tab="cats"><i class="ti ti-category"></i> Categorias</button>
     </nav>
     <div class="topbar-right">
       <select id="monthSel" class="select" title="Mês em foco"></select>
-      <button class="icon-btn" id="btnSettings" title="Configurações">⚙</button>
+      <button class="icon-btn" id="btnSettings" title="Configurações"><i class="ti ti-settings"></i></button>
     </div>
   </header>
 
@@ -59,22 +60,22 @@
     <aside class="col">
       <div class="card profile">
         <div class="profile-top">
-          <span class="rank-chip">💰 <span id="rankLabel">—</span></span>
+          <span class="rank-chip"><i class="ti ti-coin"></i> <span id="rankLabel">—</span></span>
         </div>
         <label class="photo" title="Trocar foto">
           <img id="photo" alt="">
-          <span class="photo-empty">＋<br>foto de perfil</span>
+          <span class="photo-empty"><i class="ti ti-photo-plus"></i><br>foto de perfil</span>
           <input type="file" accept="image/*" id="photoInput" hidden>
         </label>
         <div class="profile-name" id="profileName"></div>
         <div class="save-status" id="saveStatus"></div>
       </div>
 
-      <div class="section-title">⚡ Saúde financeira</div>
+      <div class="section-title"><i class="ti ti-bolt"></i> Saúde financeira</div>
       <div id="bars" class="bars"></div>
 
       <div class="card">
-        <div class="card-head spread">📊 Orçamento por categoria <button class="link-btn" data-open="cats">editar</button></div>
+        <div class="card-head spread"><i class="ti ti-chart-pie-4"></i> Orçamento por categoria <button class="link-btn" data-open="cats">editar</button></div>
         <div id="catStats" class="stats"></div>
         <div class="stats-total" id="catTotal"></div>
       </div>
@@ -87,13 +88,13 @@
           <span class="page-title">Visão do mês</span>
         </div>
         <div class="chart-box radar-box"><canvas id="radarChart"></canvas></div>
-        <div class="chart-foot" id="radarFoot">✦ Gastos por categoria · tracejado = orçamento</div>
+        <div class="chart-foot" id="radarFoot"><i class="ti ti-sparkles"></i> Gastos por categoria · tracejado = orçamento</div>
       </div>
 
       <div class="card">
         <div class="tabs small" id="lineTabs">
-          <button class="tab active" data-mode="dia">📅 Por dia</button>
-          <button class="tab" data-mode="acum">📈 Acumulado</button>
+          <button class="tab active" data-mode="dia"><i class="ti ti-calendar-month"></i> Por dia</button>
+          <button class="tab" data-mode="acum"><i class="ti ti-chart-line"></i> Acumulado</button>
         </div>
         <div class="chart-box line-box"><canvas id="lineChart"></canvas></div>
         <div class="compare" id="compare"></div>
@@ -101,8 +102,8 @@
 
       <div class="card">
         <div class="tabs small" id="yearTabs">
-          <button class="tab active" data-mode="ano">🗓️ Últimos 12 meses</button>
-          <button class="tab" data-mode="prev">🔮 Previsão</button>
+          <button class="tab active" data-mode="ano"><i class="ti ti-calendar-stats"></i> Últimos 12 meses</button>
+          <button class="tab" data-mode="prev"><i class="ti ti-telescope"></i> Previsão</button>
         </div>
         <div class="chart-box year-box"><canvas id="yearChart"></canvas></div>
         <div class="chart-foot" id="yearFoot"></div>
@@ -112,40 +113,40 @@
     <!-- DIREITA -->
     <aside class="col">
       <div class="card">
-        <div class="card-head">💳 Quanto eu devo</div>
+        <div class="card-head"><i class="ti ti-credit-card"></i> Quanto eu devo</div>
         <div class="debt-card">
-          <div class="debt-icon">🧾</div>
+          <div class="debt-icon"><i class="ti ti-file-invoice"></i></div>
           <div>
             <div class="debt-value" id="debtValue">R$ 0,00</div>
             <div class="debt-sub" id="debtSub"></div>
           </div>
         </div>
         <div class="quick-actions">
-          <button class="btn gain" data-new="entrada">＋ Entrada</button>
-          <button class="btn spend" data-new="saida">－ Gasto</button>
+          <button class="btn gain" data-new="entrada"><i class="ti ti-plus"></i> Entrada</button>
+          <button class="btn spend" data-new="saida"><i class="ti ti-minus"></i> Gasto</button>
         </div>
       </div>
 
       <div class="card">
-        <div class="card-head spread">🏦 Saldo <span><button class="link-btn" data-open="check">conferir</button> · <button class="link-btn" data-open="accounts">contas</button></span></div>
+        <div class="card-head spread"><i class="ti ti-building-bank"></i> Saldo <span><button class="link-btn" data-open="check">conferir</button> · <button class="link-btn" data-open="accounts">contas</button></span></div>
         <div class="balance" id="balanceValue">R$ 0,00</div>
         <ul class="list acc-list" id="accList"></ul>
         <div class="muted small-text" id="checkFoot"></div>
       </div>
 
       <div class="card">
-        <div class="card-head spread">💳 Cartões <button class="link-btn" data-open="accounts">editar</button></div>
+        <div class="card-head spread"><i class="ti ti-credit-card"></i> Cartões <button class="link-btn" data-open="accounts">editar</button></div>
         <ul class="list card-list" id="cardList"></ul>
       </div>
 
       <div class="card">
-        <div class="card-head">🗓️ Próximas faturas</div>
+        <div class="card-head"><i class="ti ti-calendar-month"></i> Próximas faturas</div>
         <ul class="list" id="faturasList"></ul>
         <div class="muted small-text" id="faturasFoot"></div>
       </div>
 
       <div class="card">
-        <div class="card-head" id="resumoTitle">📋 Resumo</div>
+        <div class="card-head" id="resumoTitle"><i class="ti ti-clipboard-list"></i> Resumo</div>
         <ul class="list checklist" id="resumoList"></ul>
       </div>
     </aside>
@@ -155,9 +156,9 @@
   <!-- TELAS -->
   <section class="bottom hidden" id="telas">
 
-    <div class="panel hidden" id="tab-lanc"><h2 class="screen-title">🧾 Lançamentos</h2>
+    <div class="panel hidden" id="tab-lanc"><h2 class="screen-title"><i class="ti ti-receipt-2"></i> Lançamentos</h2>
       <div class="filters">
-        <input id="fSearch" class="input grow" placeholder="🔎 Buscar descrição…">
+        <input id="fSearch" class="input grow" placeholder="Buscar descrição…">
         <select id="fType" class="select">
           <option value="">Todos os tipos</option>
           <option value="entrada">Entradas</option>
@@ -171,12 +172,12 @@
           <option value="mes">Mês selecionado</option>
           <option value="todos">Todos os meses</option>
         </select>
-        <button class="btn ghost" id="fClear" title="Limpar filtros">✕</button>
+        <button class="btn ghost" id="fClear" title="Limpar filtros"><i class="ti ti-x"></i></button>
       </div>
       <div class="filters">
         <div class="table-sum" id="tableSum"></div>
-        <button class="btn ghost" data-open="import">⬆ Importar extrato</button>
-        <button class="btn primary" data-new="saida">＋ Novo lançamento</button>
+        <button class="btn ghost" data-open="import"><i class="ti ti-upload"></i> Importar extrato</button>
+        <button class="btn primary" data-new="saida"><i class="ti ti-plus"></i> Novo lançamento</button>
       </div>
       <div class="table-wrap">
         <table class="table">
@@ -193,9 +194,9 @@
       </div>
     </div>
 
-    <div class="panel hidden" id="tab-parc"><h2 class="screen-title">💳 Parcelamentos</h2>
+    <div class="panel hidden" id="tab-parc"><h2 class="screen-title"><i class="ti ti-credit-card"></i> Parcelamentos</h2>
       <div class="card inner" id="boletoCard">
-        <div class="card-head">🧾 Carnês e boletos parcelados</div>
+        <div class="card-head"><i class="ti ti-file-invoice"></i> Carnês e boletos parcelados</div>
         <div class="table-wrap">
           <table class="table">
             <thead><tr><th>Descrição</th><th>Conta</th><th>Progresso</th><th>Próxima</th><th class="r">Valor atual</th><th class="r">Falta pagar</th><th></th></tr></thead>
@@ -204,7 +205,7 @@
         </div>
       </div>
       <div class="card inner">
-        <div class="card-head">📉 Faturas projetadas (próximos 12 meses)</div>
+        <div class="card-head"><i class="ti ti-chart-bar"></i> Faturas projetadas (próximos 12 meses)</div>
         <div class="chart-box bar-box"><canvas id="barChart"></canvas></div>
       </div>
       <div class="table-wrap">
@@ -215,10 +216,10 @@
       </div>
     </div>
 
-    <div class="panel hidden" id="tab-rec"><h2 class="screen-title">🔁 Recorrentes</h2>
+    <div class="panel hidden" id="tab-rec"><h2 class="screen-title"><i class="ti ti-repeat"></i> Recorrentes</h2>
       <div class="filters">
         <div class="rec-summary" id="recSummary"></div>
-        <button class="btn primary" id="btnNewRec">＋ Nova recorrência</button>
+        <button class="btn primary" id="btnNewRec"><i class="ti ti-plus"></i> Nova recorrência</button>
       </div>
       <div class="table-wrap">
         <table class="table">
@@ -229,18 +230,18 @@
       <p class="muted small-text">Os lançamentos são criados sozinhos quando o dia chega (ou na próxima vez que você abrir o app). Depois de criados, viram lançamentos normais: dá pra editar ou excluir cada um sem mexer na regra. As próximas ocorrências já entram na previsão e nas faturas futuras.</p>
     </div>
 
-    <div class="panel hidden" id="tab-metas"><h2 class="screen-title">🎯 Metas</h2>
+    <div class="panel hidden" id="tab-metas"><h2 class="screen-title"><i class="ti ti-target-arrow"></i> Metas</h2>
       <div class="filters">
         <div class="rec-summary" id="goalSummary"></div>
-        <button class="btn primary" id="btnNewGoal">＋ Nova meta</button>
+        <button class="btn primary" id="btnNewGoal"><i class="ti ti-plus"></i> Nova meta</button>
       </div>
       <div class="cat-cards" id="goalCards"></div>
     </div>
 
-    <div class="panel hidden" id="tab-cats"><h2 class="screen-title">🗂️ Categorias</h2>
+    <div class="panel hidden" id="tab-cats"><h2 class="screen-title"><i class="ti ti-category"></i> Categorias</h2>
       <div class="filters">
         <div class="rec-summary" id="catSummary"></div>
-        <button class="btn ghost" data-open="cats">✏️ Gerenciar categorias</button>
+        <button class="btn ghost" data-open="cats"><i class="ti ti-pencil"></i> Gerenciar categorias</button>
       </div>
       <div class="cat-cards" id="catCards"></div>
     </div>
@@ -251,8 +252,8 @@
     <form id="txForm" class="form">
       <h3 id="txDialogTitle">Novo lançamento</h3>
       <div class="seg" id="typeSeg">
-        <label><input type="radio" name="type" value="saida" checked><span>－ Gasto</span></label>
-        <label><input type="radio" name="type" value="entrada"><span>＋ Entrada</span></label>
+        <label><input type="radio" name="type" value="saida" checked><span><i class="ti ti-minus"></i> Gasto</span></label>
+        <label><input type="radio" name="type" value="entrada"><span><i class="ti ti-plus"></i> Entrada</span></label>
       </div>
       <label>Descrição<input name="desc" class="input" required maxlength="80"></label>
       <div class="row">
@@ -279,7 +280,7 @@
       </div>
       <p class="muted small-text" id="parcHint"></p>
       <div id="recRow">
-        <label class="check"><input type="checkbox" name="recorrente"> 🔁 Repetir todo mês</label>
+        <label class="check"><input type="checkbox" name="recorrente"> <i class="ti ti-repeat"></i> Repetir todo mês</label>
         <div class="row" id="recOpts">
           <label>Termina em (opcional)<input name="fim" class="input" type="month" placeholder="mm/aaaa"></label>
         </div>
@@ -307,19 +308,19 @@
         </select></label>
       </div>
       <div class="row wrap">
-        <button type="button" class="btn ghost" data-open="cats">🗂️ Categorias e orçamentos</button>
-        <button type="button" class="btn ghost" data-open="accounts">🏦 Contas e cartões</button>
-        <button type="button" class="btn ghost" data-open="import">⬆ Importar extrato (CSV/OFX)</button>
-        <button type="button" class="btn ghost" data-open="check">✅ Fazer conferência</button>
+        <button type="button" class="btn ghost" data-open="cats"><i class="ti ti-category"></i> Categorias e orçamentos</button>
+        <button type="button" class="btn ghost" data-open="accounts"><i class="ti ti-building-bank"></i> Contas e cartões</button>
+        <button type="button" class="btn ghost" data-open="import"><i class="ti ti-upload"></i> Importar extrato (CSV/OFX)</button>
+        <button type="button" class="btn ghost" data-open="check"><i class="ti ti-circle-check"></i> Fazer conferência</button>
       </div>
       <div class="row wrap">
-        <button type="button" class="btn ghost" id="btnExport">⬇ Exportar JSON</button>
-        <label class="btn ghost">⬆ Importar JSON<input type="file" accept="application/json" id="importInput" hidden></label>
-        <button type="button" class="btn ghost" id="btnRemovePhoto">🗑 Remover foto</button>
-        <button type="button" class="btn ghost hidden" id="btnLogout">🚪 Sair</button>
+        <button type="button" class="btn ghost" id="btnExport"><i class="ti ti-download"></i> Exportar JSON</button>
+        <label class="btn ghost"><i class="ti ti-upload"></i> Importar JSON<input type="file" accept="application/json" id="importInput" hidden></label>
+        <button type="button" class="btn ghost" id="btnRemovePhoto"><i class="ti ti-trash"></i> Remover foto</button>
+        <button type="button" class="btn ghost hidden" id="btnLogout"><i class="ti ti-logout"></i> Sair</button>
         <button type="button" class="btn danger" id="btnReset">Apagar tudo</button>
       </div>
-      <p class="muted small-text" id="backupNote">💾 O servidor guarda uma cópia do <code>dados.json</code> por dia na pasta <code>backups/</code> (últimos 30 dias).</p>
+      <p class="muted small-text" id="backupNote"><i class="ti ti-device-floppy"></i> O servidor guarda uma cópia do <code>dados.json</code> por dia na pasta <code>backups/</code> (últimos 30 dias).</p>
       <div class="form-actions">
         <button type="button" class="btn ghost" data-close>Cancelar</button>
         <button type="submit" class="btn primary">Salvar</button>
@@ -332,6 +333,7 @@
     <form id="catsForm" class="form">
       <h3>Categorias e orçamentos</h3>
       <p class="muted small-text">O orçamento é o teto mensal de gasto da categoria (deixe 0 pra não ter teto). Categorias removidas passam seus lançamentos pra "Outros".</p>
+<p class="muted small-text">Ícone: use um nome do <a href="https://tabler.io/icons" target="_blank" rel="noopener">tabler.io/icons</a> com o prefixo <code>ti-</code> (ex.: <code>ti-plane</code>, <code>ti-paw</code>) ou cole um emoji.</p>
       <div class="mgr-head"><b class="neg">Gastos</b><span class="muted">emoji · nome · orçamento/mês</span></div>
       <div class="mgr" id="catsSaida"></div>
       <button type="button" class="btn ghost small" data-add-cat="saida">＋ Categoria de gasto</button>
@@ -349,10 +351,10 @@
   <dialog id="accDialog" class="wide">
     <form id="accForm" class="form">
       <h3>Contas e cartões</h3>
-      <div class="mgr-head"><b>🏦 Contas</b><span class="muted">nome · saldo inicial</span></div>
+      <div class="mgr-head"><b><i class="ti ti-building-bank"></i> Contas</b><span class="muted">nome · saldo inicial</span></div>
       <div class="mgr" id="accRows"></div>
       <button type="button" class="btn ghost small" id="btnAddAcc">＋ Conta</button>
-      <div class="mgr-head"><b>💳 Cartões de crédito</b><span class="muted">nome · limite · dia que fecha · dia que vence · pago pela conta</span></div>
+      <div class="mgr-head"><b><i class="ti ti-credit-card"></i> Cartões de crédito</b><span class="muted">nome · limite · dia que fecha · dia que vence · pago pela conta</span></div>
       <div class="mgr" id="cardRows"></div>
       <button type="button" class="btn ghost small" id="btnAddCard">＋ Cartão</button>
       <p class="muted small-text">Compras feitas a partir do dia de fechamento caem na fatura seguinte. Removendo uma conta ou cartão, os lançamentos dele vão pro primeiro da lista.</p>
@@ -368,7 +370,8 @@
     <form id="goalForm" class="form">
       <h3 id="goalDialogTitle">Nova meta</h3>
       <div class="row">
-        <label class="emoji-field">Emoji<input name="emoji" class="input" maxlength="4" value="🎯"></label>
+        <label class="emoji-field">Ícone<input name="emoji" class="input" maxlength="40" value="ti-target" title="Nome do ícone (ex.: ti-plane) ou um emoji"></label>
+        <span class="ico-prev" id="goalIcoPrev"></span>
         <label>Nome<input name="name" class="input" required maxlength="40" placeholder="Viagem, notebook, reserva…"></label>
       </div>
       <div class="row">
@@ -388,8 +391,8 @@
     <form id="depForm" class="form">
       <h3 id="depTitle">Guardar dinheiro</h3>
       <div class="seg">
-        <label><input type="radio" name="dir" value="1" checked><span class="gain-opt">＋ Guardar</span></label>
-        <label><input type="radio" name="dir" value="-1"><span class="spend-opt">－ Retirar</span></label>
+        <label><input type="radio" name="dir" value="1" checked><span class="gain-opt"><i class="ti ti-plus"></i> Guardar</span></label>
+        <label><input type="radio" name="dir" value="-1"><span class="spend-opt"><i class="ti ti-minus"></i> Retirar</span></label>
       </div>
       <div class="row">
         <label>Valor (R$)<input name="value" class="input" type="number" step="0.01" min="0.01" required></label>
@@ -405,7 +408,7 @@
   <!-- MODAL CONFERÊNCIA -->
   <dialog id="checkDialog" class="wide">
     <form id="checkForm" class="form">
-      <h3>✅ Conferência</h3>
+      <h3><i class="ti ti-circle-check"></i> Conferência</h3>
       <p class="muted small-text">Abra o app do seu banco e diga quanto tem de verdade. O que ficar em branco é ignorado. Nada é alterado sem você confirmar na tela seguinte.</p>
       <div class="mgr" id="checkRows"></div>
       <div class="hidden" id="checkResult"></div>

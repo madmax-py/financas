@@ -2,12 +2,25 @@
 const LS_KEY = "financas.v1";
 
 const DEFAULT_CATS = {
-  saida: [["Alimentação", "🍜"], ["Moradia", "🏠"], ["Transporte", "🚗"], ["Lazer", "🎮"], ["Saúde", "💊"],
-    ["Educação", "📚"], ["Compras", "🛍️"], ["Assinaturas", "📺"], ["Outros", "📦"]],
-  entrada: [["Salário", "💼"], ["Freelance", "💻"], ["Investimentos", "📈"], ["Presente", "🎁"], ["Outros", "➕"]],
+  saida: [["Alimentação", "ti-tools-kitchen-2"], ["Moradia", "ti-home"], ["Transporte", "ti-car"],
+    ["Lazer", "ti-device-gamepad-2"], ["Saúde", "ti-heartbeat"], ["Educação", "ti-book"],
+    ["Compras", "ti-shopping-bag"], ["Assinaturas", "ti-device-tv"], ["Outros", "ti-package"]],
+  entrada: [["Salário", "ti-briefcase"], ["Freelance", "ti-device-laptop"], ["Investimentos", "ti-chart-line"],
+    ["Presente", "ti-gift"], ["Outros", "ti-plus"]],
 };
 const METHODS = { pix: "Pix", debito: "Débito", dinheiro: "Dinheiro", credito: "Crédito", boleto: "Boleto" };
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
+// Ícones: "ti-xxx" vira um ícone do Tabler; qualquer outra coisa (emoji) é mostrada como texto
+const ico = (v, extra = "") => (String(v || "").startsWith("ti-")
+  ? `<i class="ti ${esc(v)}${extra ? " " + extra : ""}"></i>`
+  : `<span class="emo${extra ? " " + extra : ""}">${esc(v || "")}</span>`);
+// emojis usados até a versão anterior → ícone equivalente
+const ICONES_ANTIGOS = {
+  "🍜": "ti-tools-kitchen-2", "🏠": "ti-home", "🚗": "ti-car", "🎮": "ti-device-gamepad-2", "💊": "ti-heartbeat",
+  "📚": "ti-book", "🛍️": "ti-shopping-bag", "📺": "ti-device-tv", "📦": "ti-package", "⚖️": "ti-scale",
+  "💼": "ti-briefcase", "💻": "ti-device-laptop", "📈": "ti-chart-line", "🎁": "ti-gift", "➕": "ti-plus", "•": "ti-point",
+};
 
 // ===== Helpers =====
 const $ = (s) => document.querySelector(s);
@@ -194,7 +207,8 @@ function migrate(s, fresh = false) {
   s.check ||= { periodo: 7, ultimo: null, historico: [] };
   for (const type of ["saida", "entrada"]) {
     s.cats[type] ||= [];
-    if (!s.cats[type].some((c) => c.name === "Ajuste")) s.cats[type].push({ name: "Ajuste", emoji: "⚖️", budget: 0 });
+    if (!s.cats[type].some((c) => c.name === "Ajuste")) s.cats[type].push({ name: "Ajuste", emoji: "ti-scale", budget: 0 });
+    for (const c of s.cats[type]) if (ICONES_ANTIGOS[c.emoji]) c.emoji = ICONES_ANTIGOS[c.emoji];
   }
   if (!s.cards) {
     // versão antiga tinha um único "limite do cartão" e toda compra caía na fatura do mês seguinte:
@@ -214,7 +228,7 @@ function migrate(s, fresh = false) {
 function normalizeRefs(s = state) {
   const accIds = new Set(s.accounts.map((a) => a.id)), cardIds = new Set(s.cards.map((c) => c.id));
   for (const type of ["saida", "entrada"]) {
-    if (!s.cats[type].some((c) => c.name === "Outros")) s.cats[type].push({ name: "Outros", emoji: type === "saida" ? "📦" : "➕", budget: 0 });
+    if (!s.cats[type].some((c) => c.name === "Outros")) s.cats[type].push({ name: "Outros", emoji: type === "saida" ? "ti-package" : "ti-plus", budget: 0 });
   }
   for (const t of [...s.tx, ...s.rec]) {
     if (!s.cats[t.type].some((c) => c.name === t.cat)) t.cat = "Outros";
@@ -231,7 +245,7 @@ function normalizeRefs(s = state) {
 
 const accById = (id) => state.accounts.find((a) => a.id === id) || state.accounts[0];
 const cardById = (id) => state.cards.find((c) => c.id === id) || null;
-const catEmoji = (type, name) => state.cats[type].find((c) => c.name === name)?.emoji || "•";
+const catEmoji = (type, name) => state.cats[type].find((c) => c.name === name)?.emoji || "ti-point";
 const methodLabel = (t) => {
   if (t.method === "credito" && t.type === "entrada") return `${cardById(t.cartao)?.name || "Cartão"} · estorno`;
   if (t.type === "entrada") return state.accounts.length > 1 ? accById(t.conta).name : "—";
@@ -471,46 +485,46 @@ function refresh() { save(); renderMonthSelect(); renderFilterOptions(); render(
 function renderAlerts(c) {
   const list = [];
   const cur = monthSums(CUR);
-  if (ui.recCreated) list.push(["info", "🔁", `${ui.recCreated} lançamento(s) recorrente(s) criado(s) automaticamente.`]);
+  if (ui.recCreated) list.push(["info", "ti-repeat", `${ui.recCreated} lançamento(s) recorrente(s) criado(s) automaticamente.`]);
   for (const cat of state.cats.saida) {
     const v = cur.byCat[cat.name] || 0;
     if (!cat.budget) continue;
-    if (v > cat.budget) list.push(["spend", "🚨", `Você passou do orçamento de ${cat.emoji} ${cat.name}: ${brl(v)} de ${brl(cat.budget)} (+${brl(v - cat.budget)}).`]);
-    else if (v >= cat.budget * 0.9) list.push(["warn", "⚠️", `${cat.emoji} ${cat.name} já usou ${Math.round((v / cat.budget) * 100)}% do orçamento do mês.`]);
+    if (v > cat.budget) list.push(["spend", "ti-alert-hexagon", `Você passou do orçamento de ${cat.name}: ${brl(v)} de ${brl(cat.budget)} (+${brl(v - cat.budget)}).`]);
+    else if (v >= cat.budget * 0.9) list.push(["warn", "ti-alert-triangle", `${cat.name} já usou ${Math.round((v / cat.budget) * 100)}% do orçamento do mês.`]);
   }
-  if (cur.saiM > cur.entM && cur.entM > 0) list.push(["spend", "📉", `Os gastos de ${mName(CUR).toLowerCase()} (${brl(cur.saiM)}) já passaram as entradas (${brl(cur.entM)}).`]);
+  if (cur.saiM > cur.entM && cur.entM > 0) list.push(["spend", "ti-chart-bar", `Os gastos de ${mName(CUR).toLowerCase()} (${brl(cur.saiM)}) já passaram as entradas (${brl(cur.entM)}).`]);
   // fatura bem acima da média das últimas
   const next = c.faturas.find((f) => f.v + f.p > 0);
   const past = Array.from({ length: 6 }, (_, i) => addM(CUR, -1 - i)).map((k) => sum(c.instReal.filter((x) => x.due === k), (x) => x.value)).filter((v) => v > 0);
   if (next && past.length >= 2) {
     const avg = sum(past) / past.length, v = next.v + next.p;
-    if (v > avg * 1.2) list.push(["spend", "💳", `A fatura de ${mShort(next.k)} (${brl(v)}) está ${Math.round((v / avg - 1) * 100)}% acima da sua média (${brl(avg)}).`]);
+    if (v > avg * 1.2) list.push(["spend", "ti-credit-card", `A fatura de ${mShort(next.k)} (${brl(v)}) está ${Math.round((v / avg - 1) * 100)}% acima da sua média (${brl(avg)}).`]);
   }
   for (const { c: card, used } of c.cards) {
-    if (card.limite && used / card.limite >= 0.85) list.push(["spend", "💳", `${card.name}: ${Math.round((used / card.limite) * 100)}% do limite comprometido.`]);
+    if (card.limite && used / card.limite >= 0.85) list.push(["spend", "ti-credit-card", `${card.name}: ${Math.round((used / card.limite) * 100)}% do limite comprometido.`]);
   }
   const neg = c.proj.find((p) => p.saldo < 0);
-  if (neg) list.push(["spend", "🔮", `Pela previsão, seu saldo fica negativo em ${mShort(neg.k)} (${brl(neg.saldo)}).`]);
+  if (neg) list.push(["spend", "ti-telescope", `Pela previsão, seu saldo fica negativo em ${mShort(neg.k)} (${brl(neg.saldo)}).`]);
   for (const g of state.goals) {
     const saved = goalSaved(g);
     if (!g.prazo || saved >= g.alvo) continue;
     const left = monthsBetween(CUR, g.prazo);
-    if (left < 0) list.push(["warn", "🎯", `O prazo da meta ${g.emoji} ${g.name} passou (${mShort(g.prazo)}) e faltam ${brl(g.alvo - saved)}.`]);
-    else if (left <= 1) list.push(["warn", "🎯", `Meta ${g.emoji} ${g.name}: faltam ${brl(g.alvo - saved)} e o prazo é ${mShort(g.prazo)}.`]);
+    if (left < 0) list.push(["warn", "ti-target-arrow", `O prazo da meta ${g.name} passou (${mShort(g.prazo)}) e faltam ${brl(g.alvo - saved)}.`]);
+    else if (left <= 1) list.push(["warn", "ti-target-arrow", `Meta ${g.name}: faltam ${brl(g.alvo - saved)} e o prazo é ${mShort(g.prazo)}.`]);
   }
-  for (const g of state.goals) if (goalSaved(g) >= g.alvo && g.alvo > 0) list.push(["gain", "🏆", `Meta ${g.emoji} ${g.name} concluída!`]);
+  for (const g of state.goals) if (goalSaved(g) >= g.alvo && g.alvo > 0) list.push(["gain", "ti-trophy", `Meta ${g.name} concluída!`]);
 
   if (checkAtrasada() && !ui.dismissed.has("check")) {
     const d = diasDesdeCheck();
-    list.unshift(["warn", "✅", d === null
+    list.unshift(["warn", "ti-circle-check", d === null
       ? "Confira se os saldos do app batem com os do seu banco."
       : `Faz ${d} dia(s) desde a última conferência de saldos.`, "check"]);
   }
   const visible = list.filter(([, , text]) => !ui.dismissed.has(text));
   $("#alerts").innerHTML = visible.map(([level, icon, text, acao]) =>
-    `<div class="alert ${level}"><span>${icon}</span><span class="alert-text">${esc(text)}</span>`
+    `<div class="alert ${level}"><span>${ico(icon)}</span><span class="alert-text">${esc(text)}</span>`
     + (acao === "check" ? `<button class="link-btn" data-open="check">conferir agora</button>` : "")
-    + `<button class="alert-x" data-dismiss="${esc(acao || text)}" title="Dispensar">✕</button></div>`).join("");
+    + `<button class="alert-x" data-dismiss="${esc(acao || text)}" title="Dispensar"><i class="ti ti-x"></i></button></div>`).join("");
 }
 
 function renderProfile(m) {
@@ -518,7 +532,7 @@ function renderProfile(m) {
   $(".photo").classList.toggle("has-img", !!p.photo);
   $("#photo").src = p.photo || "";
   const nameEl = $("#profileName");
-  nameEl.textContent = p.name || "Clique em ⚙ pra colocar seu nome";
+  nameEl.innerHTML = p.name ? esc(p.name) : 'Clique em <i class="ti ti-settings"></i> pra colocar seu nome';
   nameEl.classList.toggle("empty", !p.name);
   const rate = m.entM ? (m.entM - m.saiM) / m.entM : 0;
   $("#rankLabel").textContent = `${m.entM || m.saiM ? rank(rate) : "Sem rank"} · ${mName(ui.month)}`;
@@ -527,16 +541,16 @@ function renderProfile(m) {
 function renderBars(c, m) {
   const p = state.profile;
   const items = [
-    { icon: "🏦", name: "Reserva", val: p.meta ? c.balance / p.meta : 0, text: p.meta ? `${brl(Math.max(0, c.balance))} / ${brl(p.meta)}` : "defina a meta em ⚙", good: true },
-    { icon: "🔥", name: "Renda comprometida", val: m.entM ? m.saiM / m.entM : (m.saiM ? 1 : 0), text: brl(m.saiM), good: false },
-    { icon: "💳", name: "Limite usado", val: c.limitTotal ? c.debt / c.limitTotal : 0, text: c.limitTotal ? `${brl(c.debt)} / ${brl(c.limitTotal)}` : "cadastre um cartão", good: false },
-    { icon: "🌱", name: "Poupança do mês", val: m.entM ? (m.entM - m.saiM) / m.entM : 0, text: brl(m.entM - m.saiM), good: true },
+    { icon: "ti-building-bank", name: "Reserva", val: p.meta ? c.balance / p.meta : 0, text: p.meta ? `${brl(Math.max(0, c.balance))} / ${brl(p.meta)}` : "defina a meta em ⚙", good: true },
+    { icon: "ti-flame", name: "Renda comprometida", val: m.entM ? m.saiM / m.entM : (m.saiM ? 1 : 0), text: brl(m.saiM), good: false },
+    { icon: "ti-credit-card", name: "Limite usado", val: c.limitTotal ? c.debt / c.limitTotal : 0, text: c.limitTotal ? `${brl(c.debt)} / ${brl(c.limitTotal)}` : "cadastre um cartão", good: false },
+    { icon: "ti-plant-2", name: "Poupança do mês", val: m.entM ? (m.entM - m.saiM) / m.entM : 0, text: brl(m.entM - m.saiM), good: true },
   ];
   $("#bars").innerHTML = items.map((it) => {
     const v = clamp01(it.val);
     const bad = it.good ? v < 0.25 : v > 0.85;
     return `<div class="bar-card">
-      <div class="bar-label"><b>${it.icon} ${it.name}</b><span>${it.text}</span></div>
+      <div class="bar-label"><b>${ico(it.icon)} ${it.name}</b><span>${it.text}</span></div>
       <div class="track"><div class="meter ${it.good ? "gain" : "spend"}${bad && v > 0 ? " bad" : ""}"><i style="width:${v * 100}%"></i></div><span class="pct">${Math.round(v * 100)}%</span></div>
     </div>`;
   }).join("");
@@ -551,7 +565,7 @@ function renderCatStats(m, prev) {
     const over = b && v > b;
     const d = delta(v, pv);
     return `<div class="stat2">
-      <div class="stat-top"><span>${cat.emoji} ${esc(cat.name)}</span>
+      <div class="stat-top"><span>${ico(cat.emoji)} ${esc(cat.name)}</span>
         <span class="v ${over ? "neg" : ""}">${v ? brl(v) : "—"}${b ? `<span class="muted"> / ${brl(b)}</span>` : ""}</span></div>
       <div class="stat-bot"><div class="mini spend${over ? " over" : ""}"><i style="width:${w * 100}%"></i></div>
         <span class="dlt ${d.startsWith("+") || d === "novo" ? "neg" : d.startsWith("−") ? "pos" : "muted"}" title="vs ${mName(prev.M)}">${d}</span></div>
@@ -573,10 +587,10 @@ function renderRight(c, m, prev) {
   bal.textContent = brl(c.balance);
   bal.classList.toggle("neg", c.balance < 0);
   const accRows = state.accounts.length > 1
-    ? state.accounts.map((a) => `<li><span>${a.tipo === "investimento" ? "📈 " : ""}${esc(a.name)}</span><span class="v ${c.bal[a.id] < 0 ? "neg" : ""}">${brl(c.bal[a.id])}</span></li>`)
+    ? state.accounts.map((a) => `<li><span>${a.tipo === "investimento" ? ico("ti-chart-line") + " " : ""}${esc(a.name)}</span><span class="v ${c.bal[a.id] < 0 ? "neg" : ""}">${brl(c.bal[a.id])}</span></li>`)
     : [];
   if (c.guardado) {
-    accRows.push(`<li class="muted"><span>🎯 Guardado em metas</span><span class="v">− ${brl(c.guardado)}</span></li>`);
+    accRows.push(`<li class="muted"><span><i class="ti ti-target-arrow"></i> Guardado em metas</span><span class="v">− ${brl(c.guardado)}</span></li>`);
     accRows.push(`<li><span><b>Livre pra usar</b></span><span class="v ${c.balance - c.guardado < 0 ? "neg" : "pos"}"><b>${brl(c.balance - c.guardado)}</b></span></li>`);
   }
   const dCheck = diasDesdeCheck();
@@ -604,7 +618,7 @@ function renderRight(c, m, prev) {
   }).join("");
   $("#faturasFoot").textContent = six.some((f) => f.p) ? "~ inclui gastos recorrentes no crédito previstos" : "";
 
-  $("#resumoTitle").textContent = `📋 Resumo de ${mLabel(ui.month)}${futuro(ui.month) ? " (previsto)" : ""}`;
+  $("#resumoTitle").innerHTML = `<i class="ti ti-clipboard-list"></i> Resumo de ${mLabel(ui.month)}${futuro(ui.month) ? " (previsto)" : ""}`;
   const res = m.entM - m.saiM, pres = prev.entM - prev.saiM;
   const elapsed = ui.month === CUR ? Number(TODAY.slice(8)) : daysIn(ui.month);
   const biggest = m.outs.reduce((a, t) => (!a || t.value > a.value ? t : a), null);
@@ -627,8 +641,8 @@ function renderRight(c, m, prev) {
 function renderCharts(c, m, prev) {
   const prevs = previstosDoMes(ui.month);
   $("#radarFoot").innerHTML = prevs.length
-    ? `🔮 Inclui ${prevs.length} recorrência(s) prevista(s) para ${mName(ui.month).toLowerCase()} · tracejado = orçamento`
-    : "✦ Gastos por categoria · tracejado = orçamento";
+    ? `<i class="ti ti-telescope"></i> Inclui ${prevs.length} recorrência(s) prevista(s) para ${mName(ui.month).toLowerCase()} · tracejado = orçamento`
+    : '<i class="ti ti-sparkles"></i> Gastos por categoria · tracejado = orçamento';
   radar.data.labels = state.cats.saida.map((x) => x.name);
   radar.data.datasets[0].data = state.cats.saida.map((x) => m.byCat[x.name] || 0);
   const hasBudget = state.cats.saida.some((x) => x.budget);
@@ -705,12 +719,12 @@ function renderMonthSelect() {
 function renderFilterOptions() {
   const keep = (sel, html) => { const v = sel.value; sel.innerHTML = html; if ([...sel.options].some((o) => o.value === v)) sel.value = v; };
   keep($("#fCat"), `<option value="">Todas as categorias</option>`
-    + `<optgroup label="Gastos">${state.cats.saida.map((c) => `<option value="saida|${esc(c.name)}">${c.emoji} ${esc(c.name)}</option>`).join("")}</optgroup>`
-    + `<optgroup label="Entradas">${state.cats.entrada.map((c) => `<option value="entrada|${esc(c.name)}">${c.emoji} ${esc(c.name)}</option>`).join("")}</optgroup>`);
+    + `<optgroup label="Gastos">${state.cats.saida.map((c) => `<option value="saida|${esc(c.name)}">${esc(c.name)}</option>`).join("")}</optgroup>`
+    + `<optgroup label="Entradas">${state.cats.entrada.map((c) => `<option value="entrada|${esc(c.name)}">${esc(c.name)}</option>`).join("")}</optgroup>`);
   keep($("#fMethod"), `<option value="">Todos os métodos</option>`
     + ["pix", "debito", "dinheiro", "boleto"].map((k) => `<option value="${k}">${METHODS[k]}</option>`).join("")
-    + (state.cards.length ? state.cards.map((c) => `<option value="card:${c.id}">💳 ${esc(c.name)}</option>`).join("") : `<option value="credito">Crédito</option>`)
-    + (state.accounts.length > 1 ? `<optgroup label="Conta">${state.accounts.map((a) => `<option value="acc:${a.id}">🏦 ${esc(a.name)}</option>`).join("")}</optgroup>` : ""));
+    + (state.cards.length ? state.cards.map((c) => `<option value="card:${c.id}">Cartão · ${esc(c.name)}</option>`).join("") : `<option value="credito">Crédito</option>`)
+    + (state.accounts.length > 1 ? `<optgroup label="Conta">${state.accounts.map((a) => `<option value="acc:${a.id}">Conta · ${esc(a.name)}</option>`).join("")}</optgroup>` : ""));
 }
 
 function renderTable() {
@@ -741,12 +755,12 @@ function renderTable() {
     const isIn = t.type === "entrada";
     return `<tr>
       <td>${fmtDate(t.date)}</td>
-      <td class="desc">${esc(t.desc)}${t.virtual ? `<span class="rec-icon" title="Ainda não aconteceu: previsão pela recorrência">🔮</span>` : t.recId ? `<span class="rec-icon" title="Gerado por recorrência">🔁</span>` : ""}${t.fitid || t.imported ? `<span class="rec-icon" title="Importado de extrato">⬆</span>` : ""}</td>
-      <td>${catEmoji(t.type, t.cat)} ${esc(t.cat)}</td>
+      <td class="desc">${esc(t.desc)}${t.virtual ? `<span class="rec-icon" title="Ainda não aconteceu: previsão pela recorrência"><i class="ti ti-telescope"></i></span>` : t.recId ? `<span class="rec-icon" title="Gerado por recorrência"><i class="ti ti-repeat"></i></span>` : ""}${t.fitid || t.imported ? `<span class="rec-icon" title="Importado de extrato"><i class="ti ti-upload"></i></span>` : ""}</td>
+      <td>${ico(catEmoji(t.type, t.cat))} ${esc(t.cat)}</td>
       <td>${isIn && state.accounts.length < 2 ? "—" : `<span class="tag ${t.method}">${esc(methodLabel(t))}</span>`}</td>
       <td class="r ${isIn ? "pos" : "neg"}">${isIn ? "+" : "−"} ${brl(t.value)}</td>
       <td><div class="row-actions">${t.virtual ? `<span class="muted small-text">previsto</span>`
-        : `<button data-edit="${t.id}" title="Editar">✏️</button><button data-del="${t.id}" title="Excluir">🗑️</button>`}</div></td>
+        : `<button data-edit="${t.id}" title="Editar"><i class="ti ti-pencil"></i></button><button data-del="${t.id}" title="Excluir"><i class="ti ti-trash"></i></button>`}</div></td>
     </tr>`;
   }).join("") : `<tr><td colspan="6" class="empty">Nenhum lançamento encontrado.</td></tr>`;
 }
@@ -759,12 +773,12 @@ function renderParcelas(c) {
     .filter((r) => r.pend.length)
     .sort((a, b) => sum(b.pend, (x) => x.value) - sum(a.pend, (x) => x.value));
   $("#parcBody").innerHTML = rows.length ? rows.map((r) =>
-    `<tr><td class="desc">${catEmoji("saida", r.t.cat)} ${esc(r.t.desc)}</td><td>${esc(r.card?.name || "—")}</td><td>${fmtDate(r.t.date)}</td>
+    `<tr><td class="desc">${ico(catEmoji("saida", r.t.cat))} ${esc(r.t.desc)}</td><td>${esc(r.card?.name || "—")}</td><td>${fmtDate(r.t.date)}</td>
      <td>${r.next.i + 1}/${r.n} <span class="muted">(vence ${fmtDate(r.next.dueDate)})</span></td>
      <td class="r">${brl(r.t.value / r.n)}</td><td class="r neg">${brl(sum(r.pend, (x) => x.value))}</td>
-     <td><div class="row-actions"><button data-edit="${r.t.id}" title="Editar compra">✏️</button><button data-del="${r.t.id}" title="Excluir compra">🗑️</button></div></td></tr>`).join("")
+     <td><div class="row-actions"><button data-edit="${r.t.id}" title="Editar compra"><i class="ti ti-pencil"></i></button><button data-del="${r.t.id}" title="Excluir compra"><i class="ti ti-trash"></i></button></div></td></tr>`).join("")
     + `<tr><td colspan="5"><b>Total devido (bruto)</b></td><td class="r neg"><b>${brl(c.debt)}</b></td><td></td></tr>`
-    : `<tr><td colspan="7" class="empty">Nenhuma compra no crédito pendente. 🎉</td></tr>`;
+    : `<tr><td colspan="7" class="empty">Nenhuma compra no crédito pendente.</td></tr>`;
 }
 
 function renderBoletos() {
@@ -786,7 +800,7 @@ function renderBoletos() {
   $("#boletoBody").innerHTML = linhas.map((g) => {
     const t = g.next;
     return `<tr>
-      <td class="desc">${catEmoji("saida", t.cat)} ${esc(t.desc)}</td>
+      <td class="desc">${ico(catEmoji("saida", t.cat))} ${esc(t.desc)}</td>
       <td>${esc(accById(t.conta).name)}</td>
       <td>
         <div class="prog"><span>${g.pagas}/${g.n} pagas</span><div class="mini spend"><i style="width:${(g.pagas / g.n) * 100}%"></i></div></div>
@@ -795,9 +809,9 @@ function renderBoletos() {
       <td class="r">${brl(t.value)}</td>
       <td class="r neg">${brl(g.falta)}</td>
       <td><div class="row-actions">
-        <button data-edit="${t.id}" title="Editar a próxima parcela">✏️</button>
-        <button data-boleto-reajuste="${t.grupo}" title="Mudar o valor das parcelas que faltam">💲</button>
-        <button data-boleto-del="${t.grupo}" title="Excluir as parcelas que faltam">🗑️</button>
+        <button data-edit="${t.id}" title="Editar a próxima parcela"><i class="ti ti-pencil"></i></button>
+        <button data-boleto-reajuste="${t.grupo}" title="Mudar o valor das parcelas que faltam"><i class="ti ti-currency-dollar"></i></button>
+        <button data-boleto-del="${t.grupo}" title="Excluir as parcelas que faltam"><i class="ti ti-trash"></i></button>
       </div></td>
     </tr>`;
   }).join("") || `<tr><td colspan="7" class="empty">Nenhum carnê em aberto.</td></tr>`;
@@ -815,16 +829,16 @@ function renderRec() {
     const nextTxt = !next ? "encerrada" : !r.ativo ? "pausada" : fmtDate(recDate(r, next));
     return `<tr class="${r.ativo && next ? "" : "paused"}">
       <td class="desc">${esc(r.desc)}</td>
-      <td>${catEmoji(r.type, r.cat)} ${esc(r.cat)}</td>
+      <td>${ico(catEmoji(r.type, r.cat))} ${esc(r.cat)}</td>
       <td>${isIn && state.accounts.length < 2 ? "—" : `<span class="tag ${r.method}">${esc(methodLabel(r))}</span>`}</td>
       <td>dia ${r.dia}</td>
       <td>${mShort(r.inicio)} → ${r.fim ? mShort(r.fim) : "sem fim"}</td>
       <td>${nextTxt}</td>
       <td class="r ${isIn ? "pos" : "neg"}">${isIn ? "+" : "−"} ${brl(r.value)}</td>
       <td><div class="row-actions">
-        ${next ? `<button data-rec-toggle="${r.id}" title="${r.ativo ? "Pausar" : "Retomar"}">${r.ativo ? "⏸️" : "▶️"}</button>` : ""}
-        <button data-rec-edit="${r.id}" title="Editar">✏️</button>
-        <button data-rec-del="${r.id}" title="Excluir">🗑️</button>
+        ${next ? `<button data-rec-toggle="${r.id}" title="${r.ativo ? "Pausar" : "Retomar"}">${r.ativo ? '<i class="ti ti-player-pause"></i>' : '<i class="ti ti-player-play"></i>'}</button>` : ""}
+        <button data-rec-edit="${r.id}" title="Editar"><i class="ti ti-pencil"></i></button>
+        <button data-rec-del="${r.id}" title="Excluir"><i class="ti ti-trash"></i></button>
       </div></td>
     </tr>`;
   }).join("") : `<tr><td colspan="8" class="empty">Nenhuma recorrência ainda. Ex.: salário, aluguel, academia, streaming…</td></tr>`;
@@ -841,14 +855,14 @@ function renderGoals() {
     const perMonth = left && left > 0 && !done ? (g.alvo - s) / left : null;
     const deadline = !g.prazo ? "sem prazo" : left <= 0 ? `prazo era ${mShort(g.prazo)}` : `até ${mShort(g.prazo)} · ${left} ${left === 1 ? "mês" : "meses"}`;
     return `<div class="goal-card${done ? " done" : ""}">
-      <div class="goal-top"><span class="goal-emoji">${esc(g.emoji || "🎯")}</span>
+      <div class="goal-top"><span class="goal-emoji">${ico(g.emoji || "ti-target")}</span>
         <div><div class="goal-name">${esc(g.name)}</div><div class="muted small-text">${deadline}</div></div></div>
       <div class="goal-val"><b class="pos">${brl(s)}</b> <span class="muted">de ${brl(g.alvo)}</span></div>
       <div class="meter gain"><i style="width:${p * 100}%"></i></div>
-      <div class="goal-foot"><span>${Math.round(p * 100)}%</span><span class="muted">${done ? "🏆 concluída" : perMonth ? `guarde ${brl(perMonth)}/mês` : `faltam ${brl(g.alvo - s)}`}</span></div>
+      <div class="goal-foot"><span>${Math.round(p * 100)}%</span><span class="muted">${done ? '<i class="ti ti-trophy"></i> concluída' : perMonth ? `guarde ${brl(perMonth)}/mês` : `faltam ${brl(g.alvo - s)}`}</span></div>
       <div class="goal-actions">
-        <button class="btn gain small" data-goal-dep="${g.id}">＋ Guardar / retirar</button>
-        <div class="row-actions"><button data-goal-edit="${g.id}" title="Editar">✏️</button><button data-goal-del="${g.id}" title="Excluir">🗑️</button></div>
+        <button class="btn gain small" data-goal-dep="${g.id}"><i class="ti ti-plus"></i> Guardar / retirar</button>
+        <div class="row-actions"><button data-goal-edit="${g.id}" title="Editar"><i class="ti ti-pencil"></i></button><button data-goal-del="${g.id}" title="Excluir"><i class="ti ti-trash"></i></button></div>
       </div>
     </div>`;
   }).join("") : `<div class="empty-card">Nenhuma meta ainda. Crie uma pra acompanhar quanto falta (viagem, reserva, notebook…).</div>`;
@@ -869,7 +883,7 @@ function renderCatCards(m, prev) {
     const w = cat.budget ? clamp01(v / cat.budget) : v / total;
     const over = cat.budget && v > cat.budget;
     return `<div class="cat-card">
-      <div class="cat-banner" style="background:radial-gradient(circle at 70% 30%, ${b}, ${a} 70%)">${esc(cat.emoji)}</div>
+      <div class="cat-banner" style="background:radial-gradient(circle at 70% 30%, ${b}, ${a} 70%)">${ico(cat.emoji)}</div>
       <div class="cat-body"><div class="cat-name">${esc(cat.name)}<span class="muted">${cat.budget ? `${Math.round((v / cat.budget) * 100)}% do teto` : `${Math.round((v / total) * 100)}%`}</span></div>
       <div class="cat-val"><span class="${v ? "neg" : ""}">${brl(v)}</span>${cat.budget ? ` de ${brl(cat.budget)}` : ""} · ${delta(v, pv)} vs ${mName(prev.M).slice(0, 3).toLowerCase()}</div>
       <div class="mini spend${over ? " over" : ""}"><i style="width:${w * 100}%"></i></div></div>
@@ -882,7 +896,7 @@ const txDialog = $("#txDialog"), txForm = $("#txForm"), txF = txForm.elements;
 
 function fillCats(type, selected) {
   txF.cat.innerHTML = state.cats[type].map((c) =>
-    `<option value="${esc(c.name)}" ${c.name === selected ? "selected" : ""}>${esc(c.emoji)} ${esc(c.name)}</option>`).join("");
+    `<option value="${esc(c.name)}" ${c.name === selected ? "selected" : ""}>${esc(c.name)}</option>`).join("");
 }
 function fillAccCardSelects(conta, cartao) {
   txF.conta.innerHTML = state.accounts.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join("");
@@ -1115,7 +1129,8 @@ function openGoal(g = null) {
   ui.goalEditing = g?.id || null;
   goalForm.reset();
   $("#goalDialogTitle").textContent = g ? "Editar meta" : "Nova meta";
-  gF.emoji.value = g?.emoji || "🎯";
+  gF.emoji.value = g?.emoji || "ti-target";
+  atualizaPreviewIcone();
   gF.name.value = g?.name || "";
   gF.alvo.value = g?.alvo || "";
   gF.prazo.value = monthInputValue(gF.prazo, g?.prazo);
@@ -1127,7 +1142,7 @@ goalForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const prazo = parseMonth(gF.prazo.value);
   if (prazo === undefined) { alert('Não entendi o prazo. Escreva mês/ano, ex.: "12/2030" ou "dez/2030" (só "2030" vira dezembro).'); return; }
-  const data = { emoji: gF.emoji.value.trim() || "🎯", name: gF.name.value.trim(), alvo: round2(Number(gF.alvo.value)), prazo };
+  const data = { emoji: gF.emoji.value.trim() || "ti-target", name: gF.name.value.trim(), alvo: round2(Number(gF.alvo.value)), prazo };
   if (!data.name || !(data.alvo > 0)) return;
   if (ui.goalEditing) Object.assign(state.goals.find((g) => g.id === ui.goalEditing), data);
   else {
@@ -1138,6 +1153,8 @@ goalForm.addEventListener("submit", (e) => {
   refresh();
 });
 $("#btnNewGoal").addEventListener("click", () => openGoal());
+function atualizaPreviewIcone() { $("#goalIcoPrev").innerHTML = ico(gF.emoji.value.trim()); }
+gF.emoji.addEventListener("input", atualizaPreviewIcone);
 
 const depDialog = $("#depDialog"), depForm = $("#depForm"), dF = depForm.elements;
 $("#goalCards").addEventListener("click", (e) => {
@@ -1153,7 +1170,7 @@ $("#goalCards").addEventListener("click", (e) => {
   }
   ui.depGoal = g.id;
   depForm.reset();
-  $("#depTitle").textContent = `${g.emoji} ${g.name} · ${brl(goalSaved(g))} guardado`;
+  $("#depTitle").innerHTML = `${ico(g.emoji)} ${esc(g.name)} · ${brl(goalSaved(g))} guardado`;
   dF.date.value = TODAY;
   depDialog.showModal();
   dF.value.focus();
@@ -1171,18 +1188,23 @@ depForm.addEventListener("submit", (e) => {
 
 // ===== Categorias (gerenciar + orçamentos) =====
 const catsDialog = $("#catsDialog"), catsForm = $("#catsForm");
-const catRow = (type, c = { name: "", emoji: type === "saida" ? "📦" : "➕", budget: 0 }) => `
+const catRow = (type, c = { name: "", emoji: type === "saida" ? "ti-package" : "ti-plus", budget: 0 }) => `
   <div class="mgr-row" data-orig="${esc(c.name)}">
-    <input class="input emoji" value="${esc(c.emoji)}" maxlength="4" data-f="emoji">
+    <span class="ico-prev">${ico(c.emoji)}</span>
+    <input class="input emoji" value="${esc(c.emoji)}" maxlength="40" title="Nome do ícone (ex.: ti-car) ou um emoji" data-f="emoji">
     <input class="input" value="${esc(c.name)}" maxlength="30" placeholder="Nome" data-f="name" required>
     ${type === "saida" ? `<input class="input num" type="number" step="0.01" min="0" value="${c.budget || ""}" placeholder="sem teto" data-f="budget">` : ""}
-    <button type="button" class="icon-btn" data-remove title="Remover">🗑️</button>
+    <button type="button" class="icon-btn" data-remove title="Remover"><i class="ti ti-trash"></i></button>
   </div>`;
 function openCats() {
   $("#catsSaida").innerHTML = state.cats.saida.map((c) => catRow("saida", c)).join("");
   $("#catsEntrada").innerHTML = state.cats.entrada.map((c) => catRow("entrada", c)).join("");
   catsDialog.showModal();
 }
+catsForm.addEventListener("input", (e) => {
+  if (e.target.dataset.f !== "emoji") return;
+  e.target.closest(".mgr-row").querySelector(".ico-prev").innerHTML = ico(e.target.value.trim());
+});
 catsForm.addEventListener("click", (e) => {
   const add = e.target.closest("[data-add-cat]");
   if (add) {
@@ -1224,7 +1246,7 @@ const accRow = (a = { id: uid(), name: "", inicial: 0, tipo: "corrente" }) => `
       <option value="investimento" ${a.tipo === "investimento" ? "selected" : ""}>Investimento</option>
     </select>
     <input class="input num" type="number" step="0.01" value="${a.inicial || 0}" data-f="inicial" title="Saldo inicial">
-    <button type="button" class="icon-btn" data-remove title="Remover">🗑️</button>
+    <button type="button" class="icon-btn" data-remove title="Remover"><i class="ti ti-trash"></i></button>
   </div>`;
 const cardRow = (c = { id: uid(), name: "", limite: 0, fecha: 1, vence: 10, conta: "" }) => `
   <div class="mgr-row" data-id="${c.id}">
@@ -1233,7 +1255,7 @@ const cardRow = (c = { id: uid(), name: "", limite: 0, fecha: 1, vence: 10, cont
     <input class="input day" type="number" min="1" max="31" value="${c.fecha}" data-f="fecha" title="Dia que fecha">
     <input class="input day" type="number" min="1" max="31" value="${c.vence}" data-f="vence" title="Dia que vence">
     <select class="select" data-f="conta" data-val="${c.conta}"></select>
-    <button type="button" class="icon-btn" data-remove title="Remover">🗑️</button>
+    <button type="button" class="icon-btn" data-remove title="Remover"><i class="ti ti-trash"></i></button>
   </div>`;
 function refreshCardAccOptions() {
   const accs = [...$("#accRows").querySelectorAll(".mgr-row")].map((r) => ({ id: r.dataset.id, name: r.querySelector("[data-f=name]").value.trim() || "(sem nome)" }));
@@ -1290,7 +1312,7 @@ function openCheck() {
   const linhas = [
     ...state.accounts.map((a) => ({
       kind: "acc", id: a.id, modo: "saldo",
-      titulo: `${a.tipo === "investimento" ? "📈" : "🏦"} ${a.name}`,
+      titulo: `${ico(a.tipo === "investimento" ? "ti-chart-line" : "ti-building-bank")} ${esc(a.name)}`,
       pergunta: a.tipo === "investimento" ? "quanto a carteira vale hoje" : "quanto tem no extrato",
       esperado: round2(c.bal[a.id] ?? 0),
     })),
@@ -1299,7 +1321,7 @@ function openCheck() {
       const temLimite = !!card.limite;
       return {
         kind: "card", id: card.id, modo: temLimite ? "disponivel" : "usado",
-        titulo: `💳 ${card.name}`,
+        titulo: `${ico("ti-credit-card")} ${esc(card.name)}`,
         pergunta: temLimite ? "limite disponível no app do banco" : "total comprometido (sem limite cadastrado)",
         esperado: round2(temLimite ? card.limite - info.used : info.used),
       };
@@ -1307,7 +1329,7 @@ function openCheck() {
   ];
   $("#checkRows").innerHTML = linhas.map((l) => `
     <div class="check-row" data-kind="${l.kind}" data-id="${l.id}" data-modo="${l.modo}">
-      <div class="check-label"><b>${esc(l.titulo)}</b><span class="muted">${esc(l.pergunta)} · o app diz ${brl(l.esperado)}</span></div>
+      <div class="check-label"><b>${l.titulo}</b><span class="muted">${esc(l.pergunta)} · o app diz ${brl(l.esperado)}</span></div>
       <input class="input num" type="number" step="0.01" placeholder="R$ de verdade">
     </div>`).join("");
   $("#checkResult").classList.add("hidden");
@@ -1365,7 +1387,7 @@ checkForm.addEventListener("submit", (e) => {
     const box = $("#checkResult");
     box.classList.remove("hidden");
     if (!diffs.length) {
-      box.innerHTML = `<div class="check-ok">✅ Tudo bate. Nada pra ajustar.</div>`;
+      box.innerHTML = `<div class="check-ok"><i class="ti ti-circle-check"></i> Tudo bate. Nada pra ajustar.</div>`;
       $("#checkSubmit").textContent = "Marcar como conferido";
     } else {
       box.innerHTML = `<div class="mgr-head"><b>Diferenças encontradas</b><span class="muted">desmarque o que não quiser ajustar</span></div>`
@@ -1511,8 +1533,8 @@ function autoMapCSV(table) {
 function openImport() {
   imp = null;
   impForm.reset();
-  $("#impDest").innerHTML = state.accounts.map((a) => `<option value="acc:${a.id}">🏦 ${esc(a.name)}</option>`).join("")
-    + state.cards.map((c) => `<option value="card:${c.id}">💳 ${esc(c.name)}</option>`).join("");
+  $("#impDest").innerHTML = state.accounts.map((a) => `<option value="acc:${a.id}">Conta · ${esc(a.name)}</option>`).join("")
+    + state.cards.map((c) => `<option value="card:${c.id}">Cartão · ${esc(c.name)}</option>`).join("");
   ["#impMap", "#impSignRow", "#impPreviewWrap"].forEach((s) => $(s).classList.add("hidden"));
   $("#impSubmit").disabled = true;
   impDialog.showModal();
@@ -1587,7 +1609,7 @@ async function handleImportFile(file) {
   const tipo = cartao === true ? "fatura de cartão" : cartao === false ? "extrato de conta" : null;
   const nomeBanco = banco ? `<b>${esc(banco.replace(/(^|\s)\w/g, (c) => c.toUpperCase()))}</b>` : null;
   $("#impDetected").innerHTML = banco || tipo
-    ? `🔎 Detectei ${[nomeBanco, tipo].filter(Boolean).join(" · ")}`
+    ? `<i class="ti ti-search"></i> Detectei ${[nomeBanco, tipo].filter(Boolean).join(" · ")}`
       + (certo ? ` → vai pra <b>${esc(dest.label)}</b>. Se não for isso, troque acima.`
         : dest ? `. Não achei ${cartao ? "cartão" : "conta"} com esse nome, então escolhi <b>${esc(dest.label)}</b> — confira o destino acima.`
         : ". Escolha o destino acima.")
@@ -1661,7 +1683,7 @@ function renderImportPreview() {
       <td><input type="checkbox" data-imp-check="${i}" ${it.checked ? "checked" : ""}></td>
       <td>${fmtDate(it.date)}</td>
       <td class="desc">${esc(it.desc)}${it.note ? ` <span class="tag">${it.note}</span>` : ""}</td>
-      <td><select class="select sm" data-imp-cat="${i}">${state.cats[it.type].map((c) => `<option value="${esc(c.name)}" ${c.name === it.cat ? "selected" : ""}>${esc(c.emoji)} ${esc(c.name)}</option>`).join("")}</select></td>
+      <td><select class="select sm" data-imp-cat="${i}">${state.cats[it.type].map((c) => `<option value="${esc(c.name)}" ${c.name === it.cat ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></td>
       <td class="r ${it.type === "entrada" ? "pos" : "neg"}">${it.type === "entrada" ? "+" : "−"} ${brl(it.value)}</td>
     </tr>`).join("") : `<tr><td colspan="5" class="empty">Nenhuma transação reconhecida. Confira as colunas escolhidas acima.</td></tr>`;
   updateImportCount();
@@ -1730,8 +1752,8 @@ $("#btnSettings").addEventListener("click", () => {
   setF.check.value = String(state.check.periodo ?? 7);
   $("#btnLogout").classList.toggle("hidden", !ui.cloud);
   $("#backupNote").innerHTML = ui.cloud
-    ? "💾 A nuvem guarda uma cópia dos seus dados por dia (últimos 30 dias). Use também o Exportar JSON de vez em quando."
-    : "💾 O servidor guarda uma cópia do <code>dados.json</code> por dia na pasta <code>backups/</code> (últimos 30 dias).";
+    ? '<i class="ti ti-device-floppy"></i> A nuvem guarda uma cópia dos seus dados por dia (últimos 30 dias). Use também o Exportar JSON de vez em quando.'
+    : '<i class="ti ti-device-floppy"></i> O servidor guarda uma cópia do <code>dados.json</code> por dia na pasta <code>backups/</code> (últimos 30 dias).';
   setDialog.showModal();
 });
 setForm.addEventListener("submit", (e) => {
