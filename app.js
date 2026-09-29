@@ -191,6 +191,7 @@ function migrate(s, fresh = false) {
   s.tx ||= [];
   s.rec ||= [];
   s.goals ||= [];
+  s.importLog ||= [];
   for (const g of s.goals) { g.prazo = parseMonth(g.prazo) ?? null; g.aportes ||= []; }
   for (const r of s.rec) r.fim = parseMonth(r.fim) ?? null;
   if (!s.cats) {
@@ -704,8 +705,8 @@ function renderCompare(m, prev) {
     `<span>entradas <b class="${m.entM >= prev.entM ? "pos" : "neg"}">${delta(m.entM, prev.entM)}</b></span>`,
     `<span>gastos <b class="${m.saiM <= prev.saiM ? "pos" : "neg"}">${delta(m.saiM, prev.saiM)}</b></span>`,
   ];
-  if (up && up.d > 0) parts.push(`<span>maior alta: ${up.c.emoji} ${esc(up.c.name)} <b class="neg">+${brl(up.d)}</b></span>`);
-  if (down && down.d < 0) parts.push(`<span>maior queda: ${down.c.emoji} ${esc(down.c.name)} <b class="pos">−${brl(-down.d)}</b></span>`);
+  if (up && up.d > 0) parts.push(`<span>maior alta: ${ico(up.c.emoji)} ${esc(up.c.name)} <b class="neg">+${brl(up.d)}</b></span>`);
+  if (down && down.d < 0) parts.push(`<span>maior queda: ${ico(down.c.emoji)} ${esc(down.c.name)} <b class="pos">−${brl(-down.d)}</b></span>`);
   $("#compare").innerHTML = parts.join("");
 }
 
@@ -1530,14 +1531,30 @@ function autoMapCSV(table) {
   return { header, data, cols, dc, vc, sc };
 }
 
+function primeiroDest() {
+  return state.accounts[0] ? `acc:${state.accounts[0].id}` : (state.cards[0] ? `card:${state.cards[0].id}` : "");
+}
+const destOptions = (sel) => state.accounts.map((a) => `<option value="acc:${a.id}" ${sel === `acc:${a.id}` ? "selected" : ""}>Conta · ${esc(a.name)}</option>`).join("")
+  + state.cards.map((c) => `<option value="card:${c.id}" ${sel === `card:${c.id}` ? "selected" : ""}>Cartão · ${esc(c.name)}</option>`).join("");
+const destLabel = (v) => (v.startsWith("card:") ? cardById(v.slice(5))?.name : accById(v.slice(4))?.name) || "—";
+const modoImport = () => impForm.elements.modo.value;
+
 function openImport() {
-  imp = null;
+  imp = { arquivos: [] };
   impForm.reset();
-  $("#impDest").innerHTML = state.accounts.map((a) => `<option value="acc:${a.id}">Conta · ${esc(a.name)}</option>`).join("")
-    + state.cards.map((c) => `<option value="card:${c.id}">Cartão · ${esc(c.name)}</option>`).join("");
-  ["#impMap", "#impSignRow", "#impPreviewWrap"].forEach((s) => $(s).classList.add("hidden"));
+  $("#impFiles").classList.add("hidden");
+  $("#impPreviewWrap").classList.add("hidden");
   $("#impSubmit").disabled = true;
+  $("#impSubmit").textContent = "Importar";
+  renderImportLog();
   impDialog.showModal();
+}
+
+function renderImportLog() {
+  const log = (state.importLog || []).slice(-3).reverse();
+  $("#impLog").innerHTML = log.length
+    ? `<b>Últimas importações:</b> ` + log.map((l) => `${fmtDate(l.date)} — ${l.novos} novo(s)${l.repetidos ? `, ${l.repetidos} já existiam` : ""}`).join(" · ")
+    : "";
 }
 
 async function readFileText(file) {
@@ -1583,145 +1600,195 @@ function detectSource(file, text, table) {
   return { banco, cartao, dest, certo: !!achado };
 }
 
-async function handleImportFile(file) {
-  if (!file) return;
-  const text = await readFileText(file);
-  const ofx = /<OFX>|<STMTTRN>/i.test(text);
-  let table = null;
-  if (ofx) {
-    imp = { kind: "ofx", raw: parseOFX(text) };
-    $("#impMap").classList.add("hidden");
-    $("#impSignRow").classList.add("hidden");
-  } else {
-    const rows = parseCSV(text);
-    if (!rows.length) { alert("Não achei linhas nesse arquivo."); return; }
-    table = autoMapCSV(rows);
-    imp = { kind: "csv", ...table };
-    const opts = [...Array(table.cols).keys()].map((i) => `<option value="${i}">${esc(table.header?.[i] || `Coluna ${i + 1}`)}</option>`).join("");
-    for (const [sel, v] of [["#impColDate", table.dc], ["#impColDesc", table.sc], ["#impColVal", table.vc]]) { $(sel).innerHTML = opts; $(sel).value = v; }
-    $("#impMap").classList.remove("hidden");
-    $("#impSignRow").classList.remove("hidden");
-  }
 
-  const { banco, cartao, dest, certo } = detectSource(file, text, table);
-  if (dest) $("#impDest").value = dest.v;
-  if (!ofx) $("#impPositiveSpend").checked = $("#impDest").value.startsWith("card:");
-  const tipo = cartao === true ? "fatura de cartão" : cartao === false ? "extrato de conta" : null;
-  const nomeBanco = banco ? `<b>${esc(banco.replace(/(^|\s)\w/g, (c) => c.toUpperCase()))}</b>` : null;
-  $("#impDetected").innerHTML = banco || tipo
-    ? `<i class="ti ti-search"></i> Detectei ${[nomeBanco, tipo].filter(Boolean).join(" · ")}`
-      + (certo ? ` → vai pra <b>${esc(dest.label)}</b>. Se não for isso, troque acima.`
-        : dest ? `. Não achei ${cartao ? "cartão" : "conta"} com esse nome, então escolhi <b>${esc(dest.label)}</b> — confira o destino acima.`
-        : ". Escolha o destino acima.")
-    : "";
-  buildImportItems();
+// Lê um ou vários arquivos de uma vez; cada um vira uma "origem" com seu destino
+async function addImportFiles(lista) {
+  imp ||= { arquivos: [] };
+  const problemas = [];
+  for (const file of [...lista]) {
+    if (!/\.(csv|ofx|txt)$/i.test(file.name)) { problemas.push(`${file.name} (formato não suportado)`); continue; }
+    const text = await readFileText(file);
+    const ofx = /<OFX>|<STMTTRN>/i.test(text);
+    let table = null, raw = null;
+    if (ofx) {
+      raw = parseOFX(text);
+      if (!raw.length) { problemas.push(`${file.name} (nenhuma transação no OFX)`); continue; }
+    } else {
+      const linhas = parseCSV(text);
+      if (!linhas.length) { problemas.push(`${file.name} (arquivo vazio)`); continue; }
+      table = autoMapCSV(linhas);
+    }
+    const det = detectSource(file, text, table);
+    const dest = det.dest?.v || primeiroDest();
+    imp.arquivos.push({ nome: file.name, kind: ofx ? "ofx" : "csv", raw, table, det, dest,
+      positiveSpend: !ofx && dest.startsWith("card:"), itens: [] });
+  }
+  if (problemas.length) alert(`Não consegui ler:\n- ${problemas.join("\n- ")}`);
+  rebuildImport();
 }
 
-$("#impFile").addEventListener("change", (e) => { handleImportFile(e.target.files[0]); });
-["#impColDate", "#impColDesc", "#impColVal", "#impPositiveSpend"].forEach((s) => $(s).addEventListener("change", buildImportItems));
-$("#impDest").addEventListener("change", () => {
-  if (imp?.kind === "csv") $("#impPositiveSpend").checked = $("#impDest").value.startsWith("card:");
-  buildImportItems();
-});
+const chaveTx = (dest, date, value, desc) => `${dest}|${date}|${round2(value)}|${normDesc(desc)}`;
+const destDoTx = (t) => (t.method === "credito" && t.cartao ? `card:${t.cartao}` : `acc:${t.conta}`);
 
-// ----- Arrastar e soltar o extrato em qualquer lugar da página -----
-let dragDepth = 0;
-const isFileDrag = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
-window.addEventListener("dragenter", (e) => {
-  if (!isFileDrag(e)) return;
-  e.preventDefault();
-  if (++dragDepth === 1) $("#dropzone").classList.remove("hidden");
-});
-window.addEventListener("dragover", (e) => { if (isFileDrag(e)) e.preventDefault(); });
-window.addEventListener("dragleave", (e) => { if (isFileDrag(e) && --dragDepth <= 0) { dragDepth = 0; $("#dropzone").classList.add("hidden"); } });
-window.addEventListener("drop", async (e) => {
-  if (!isFileDrag(e)) return;
-  e.preventDefault();
-  dragDepth = 0;
-  $("#dropzone").classList.add("hidden");
-  const file = e.dataTransfer.files[0];
-  if (!file) return;
-  if (/\.json$/i.test(file.name)) {
-    if (!confirm(`Restaurar o backup "${file.name}"? Isso substitui TODOS os dados atuais.`)) return;
-    return restoreBackup(file);
-  }
-  if (!/\.(csv|ofx|txt)$/i.test(file.name)) { alert("Solte um extrato em CSV ou OFX (ou um backup .json)."); return; }
-  $$("dialog[open]").forEach((d) => d.close());
-  openImport();
-  $("#impFile").value = "";
-  await handleImportFile(file);
-});
+function linhasDoCsv(a) {
+  const { data, dc, sc, vc } = a.table;
+  return data.map((r) => ({ date: parseDate(r[dc] || ""), desc: (r[sc] || "").trim() || "Sem descrição", amount: parseAmount(r[vc]), fitid: null }))
+    .filter((r) => r.date && r.amount !== null && r.amount !== 0);
+}
 
-function buildImportItems() {
+// Marca como repetido o que já existe no app ou o que já apareceu num arquivo anterior deste lote.
+// Duplicatas dentro do MESMO arquivo são mantidas: duas compras iguais no mesmo dia acontecem.
+function rebuildImport() {
   if (!imp) return;
-  let raw;
-  if (imp.kind === "ofx") raw = imp.raw;
-  else {
-    const dc = Number($("#impColDate").value), sc = Number($("#impColDesc").value), vc = Number($("#impColVal").value);
-    raw = imp.data.map((r) => ({ date: parseDate(r[dc] || ""), desc: (r[sc] || "").trim() || "Sem descrição", amount: parseAmount(r[vc]), fitid: null }))
-      .filter((r) => r.date && r.amount !== null && r.amount !== 0);
+  const contagem = new Map();
+  for (const t of state.tx) {
+    const k = chaveTx(destDoTx(t), t.date, t.value, t.desc);
+    contagem.set(k, (contagem.get(k) || 0) + 1);
   }
-  const positiveSpend = imp.kind === "csv" && $("#impPositiveSpend").checked;
-  const toCard = $("#impDest").value.startsWith("card:");
-  const existing = new Set(state.tx.map((t) => `${t.date}|${round2(t.value)}|${normDesc(t.desc)}`));
   const fitids = new Set(state.tx.map((t) => t.fitid).filter(Boolean));
-  imp.items = raw.map((r) => {
-    const type = (positiveSpend ? r.amount > 0 : r.amount < 0) ? "saida" : "entrada";
-    const value = round2(Math.abs(r.amount));
-    const dup = (r.fitid && fitids.has(r.fitid)) || existing.has(`${r.date}|${value}|${normDesc(r.desc)}`);
-    // numa fatura de cartão, "entradas" são pagamentos da fatura ou estornos: desmarcadas por padrão
-    const skip = dup || (toCard && type === "entrada");
-    return { ...r, type, value, cat: guessCat(type, r.desc), dup, checked: !skip, note: dup ? "já existe" : toCard && type === "entrada" ? "pagamento/estorno?" : "" };
-  }).sort((a, b) => b.date.localeCompare(a.date));
+
+  for (const a of imp.arquivos) {
+    const bruto = a.kind === "ofx" ? a.raw : linhasDoCsv(a);
+    const paraCartao = a.dest.startsWith("card:");
+    const positivoEhGasto = a.kind === "csv" && a.positiveSpend;
+    a.itens = bruto.map((r) => {
+      const type = (positivoEhGasto ? r.amount > 0 : r.amount < 0) ? "saida" : "entrada";
+      const value = round2(Math.abs(r.amount));
+      const k = chaveTx(a.dest, r.date, value, r.desc);
+      let dup = false;
+      if (r.fitid && fitids.has(r.fitid)) dup = true;
+      else if ((contagem.get(k) || 0) > 0) { dup = true; contagem.set(k, contagem.get(k) - 1); }
+      // numa fatura de cartão, "entradas" são pagamento da fatura ou estorno
+      const pagamento = paraCartao && type === "entrada";
+      return { ...r, chave: k, type, value, cat: guessCat(type, r.desc),
+        dup, pagamento, checked: !dup && !pagamento,
+        nota: dup ? "já existe" : pagamento ? "pagamento/estorno?" : "" };
+    }).sort((x, y) => y.date.localeCompare(x.date));
+    // o que é novo aqui já conta como existente pros próximos arquivos do lote
+    for (const it of a.itens) if (!it.dup) contagem.set(it.chave, (contagem.get(it.chave) || 0) + 1);
+  }
+  renderImportFiles();
   renderImportPreview();
 }
+
+function renderImportFiles() {
+  const box = $("#impFiles");
+  box.classList.toggle("hidden", !imp.arquivos.length);
+  box.innerHTML = imp.arquivos.map((a, i) => {
+    const novas = a.itens.filter((x) => !x.dup && !x.pagamento).length;
+    const repetidas = a.itens.filter((x) => x.dup).length;
+    const tipo = a.det.cartao === true ? "fatura de cartão" : a.det.cartao === false ? "extrato de conta" : "origem desconhecida";
+    const banco = a.det.banco ? a.det.banco.replace(/(^|\s)\w/g, (c) => c.toUpperCase()) : null;
+    const colunas = a.kind === "csv" ? `
+      <button type="button" class="link-btn" data-cols="${i}">colunas</button>
+      <div class="row hidden" data-cols-row="${i}">
+        ${[["Data", "dc"], ["Descrição", "sc"], ["Valor", "vc"]].map(([rot, campo]) => `
+          <label>${rot}<select class="select sm" data-col="${i}:${campo}">
+            ${[...Array(a.table.cols).keys()].map((c) => `<option value="${c}" ${a.table[campo] === c ? "selected" : ""}>${esc(a.table.header?.[c] || `Coluna ${c + 1}`)}</option>`).join("")}
+          </select></label>`).join("")}
+        <label class="check"><input type="checkbox" data-sign="${i}" ${a.positiveSpend ? "checked" : ""}> Valores positivos são gastos</label>
+      </div>` : "";
+    return `<div class="imp-file">
+      <div class="imp-file-top">
+        <div>
+          <b><i class="ti ti-file-text"></i> ${esc(a.nome)}</b>
+          <div class="muted small-text">${[banco, tipo].filter(Boolean).join(" · ")} · ${a.itens.length} transação(ões) · <b class="pos">${novas} nova(s)</b>${repetidas ? ` · ${repetidas} já existiam` : ""}</div>
+        </div>
+        <div class="imp-file-dest">
+          <select class="select sm" data-dest="${i}">${destOptions(a.dest)}</select>
+          <button type="button" class="icon-btn" data-rm-file="${i}" title="Tirar este arquivo"><i class="ti ti-x"></i></button>
+        </div>
+      </div>
+      ${colunas}
+    </div>`;
+  }).join("");
+}
+
+function itensVisiveis() {
+  const todos = imp.arquivos.flatMap((a, i) => a.itens.map((it, j) => ({ it, i, j, origem: destLabel(a.dest) })));
+  todos.sort((x, y) => y.it.date.localeCompare(x.it.date));
+  return modoImport() === "novas" ? todos.filter((x) => !x.it.dup) : todos;
+}
+
 function renderImportPreview() {
-  const items = imp.items;
-  $("#impPreviewWrap").classList.remove("hidden");
-  $("#impBody").innerHTML = items.length ? items.map((it, i) => `
+  const linhas = itensVisiveis();
+  $("#impPreviewWrap").classList.toggle("hidden", !imp.arquivos.length);
+  $("#impBody").innerHTML = linhas.length ? linhas.map(({ it, i, j, origem }) => `
     <tr class="${it.checked ? "" : "paused"}">
-      <td><input type="checkbox" data-imp-check="${i}" ${it.checked ? "checked" : ""}></td>
+      <td><input type="checkbox" data-imp-check="${i}:${j}" ${it.checked ? "checked" : ""}></td>
       <td>${fmtDate(it.date)}</td>
-      <td class="desc">${esc(it.desc)}${it.note ? ` <span class="tag">${it.note}</span>` : ""}</td>
-      <td><select class="select sm" data-imp-cat="${i}">${state.cats[it.type].map((c) => `<option value="${esc(c.name)}" ${c.name === it.cat ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></td>
+      <td class="desc">${esc(it.desc)}${it.nota ? ` <span class="tag">${it.nota}</span>` : ""}</td>
+      <td class="muted">${esc(origem)}</td>
+      <td><select class="select sm" data-imp-cat="${i}:${j}">${state.cats[it.type].map((c) => `<option value="${esc(c.name)}" ${c.name === it.cat ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></td>
       <td class="r ${it.type === "entrada" ? "pos" : "neg"}">${it.type === "entrada" ? "+" : "−"} ${brl(it.value)}</td>
-    </tr>`).join("") : `<tr><td colspan="5" class="empty">Nenhuma transação reconhecida. Confira as colunas escolhidas acima.</td></tr>`;
+    </tr>`).join("")
+    : `<tr><td colspan="6" class="empty">${imp.arquivos.length ? "Nada de novo nesses arquivos — tudo já estava lançado." : "Escolha os arquivos acima."}</td></tr>`;
   updateImportCount();
 }
+
 function updateImportCount() {
-  const n = imp.items.filter((x) => x.checked).length;
-  $("#impCount").textContent = `${imp.items.length} transação(ões) no arquivo · ${n} marcada(s)${imp.items.some((x) => x.dup) ? ` · ${imp.items.filter((x) => x.dup).length} já existiam` : ""}`;
-  $("#impSubmit").disabled = !n;
-  $("#impSubmit").textContent = n ? `Importar ${n}` : "Importar";
+  const todos = imp.arquivos.flatMap((a) => a.itens);
+  const marcados = todos.filter((x) => x.checked).length;
+  const repetidos = todos.filter((x) => x.dup).length;
+  const pagamentos = todos.filter((x) => x.pagamento && !x.dup).length;
+  $("#impCount").innerHTML = `${imp.arquivos.length} arquivo(s) · ${todos.length} transação(ões) · <b class="pos">${marcados} a importar</b>`
+    + (repetidos ? ` · ${repetidos} já existiam` : "") + (pagamentos ? ` · ${pagamentos} pagamento(s) de fatura ignorado(s)` : "");
+  $("#impSubmit").disabled = !marcados;
+  $("#impSubmit").textContent = marcados ? `Importar ${marcados}` : "Importar";
 }
+
+const itemPorId = (id) => { const [i, j] = id.split(":").map(Number); return imp.arquivos[i].itens[j]; };
+$("#impFile").addEventListener("change", (e) => { addImportFiles(e.target.files); e.target.value = ""; });
+$("#impModo").addEventListener("change", () => { if (imp) renderImportPreview(); });
+$("#impFiles").addEventListener("change", (e) => {
+  const dest = e.target.dataset.dest, col = e.target.dataset.col, sign = e.target.dataset.sign;
+  if (dest !== undefined) {
+    const a = imp.arquivos[Number(dest)];
+    a.dest = e.target.value;
+    if (a.kind === "csv") a.positiveSpend = a.dest.startsWith("card:");
+  }
+  if (col !== undefined) { const [i, campo] = col.split(":"); imp.arquivos[Number(i)].table[campo] = Number(e.target.value); }
+  if (sign !== undefined) imp.arquivos[Number(sign)].positiveSpend = e.target.checked;
+  rebuildImport();
+});
+$("#impFiles").addEventListener("click", (e) => {
+  const cols = e.target.closest("[data-cols]"), rm = e.target.closest("[data-rm-file]");
+  if (cols) $(`[data-cols-row="${cols.dataset.cols}"]`).classList.toggle("hidden");
+  if (rm) { imp.arquivos.splice(Number(rm.dataset.rmFile), 1); rebuildImport(); }
+});
 $("#impBody").addEventListener("change", (e) => {
   const c = e.target.dataset.impCheck, s = e.target.dataset.impCat;
-  if (c !== undefined) { imp.items[c].checked = e.target.checked; e.target.closest("tr").classList.toggle("paused", !e.target.checked); updateImportCount(); }
-  if (s !== undefined) imp.items[s].cat = e.target.value;
+  if (c !== undefined) { itemPorId(c).checked = e.target.checked; e.target.closest("tr").classList.toggle("paused", !e.target.checked); updateImportCount(); }
+  if (s !== undefined) itemPorId(s).cat = e.target.value;
 });
 $("#impToggleAll").addEventListener("click", () => {
-  const all = imp?.items.every((x) => x.checked);
-  imp?.items.forEach((x) => { x.checked = !all; });
-  if (imp) renderImportPreview();
+  const linhas = itensVisiveis();
+  const todosMarcados = linhas.every(({ it }) => it.checked);
+  linhas.forEach(({ it }) => { it.checked = !todosMarcados; });
+  renderImportPreview();
 });
+
 impForm.addEventListener("submit", (e) => {
   e.preventDefault();
   if (!imp) return;
-  const [kind, id] = $("#impDest").value.split(":");
-  const chosen = imp.items.filter((x) => x.checked);
-  for (const it of chosen) {
-    const base = { id: uid(), type: it.type, desc: it.desc, cat: it.cat, value: it.value, date: it.date, parcelas: 1, imported: true, ...(it.fitid ? { fitid: it.fitid } : {}) };
-    if (kind === "card" && it.type === "saida") state.tx.push({ ...base, method: "credito", cartao: id });
-    else state.tx.push({ ...base, method: it.type === "entrada" ? "pix" : "debito", conta: kind === "acc" ? id : cardById(id)?.conta || state.accounts[0].id });
+  let novos = 0;
+  const repetidos = imp.arquivos.flatMap((a) => a.itens).filter((x) => x.dup).length;
+  for (const a of imp.arquivos) {
+    const [kind, id] = a.dest.split(":");
+    for (const it of a.itens.filter((x) => x.checked)) {
+      const base = { id: uid(), type: it.type, desc: it.desc, cat: it.cat, value: it.value, date: it.date, parcelas: 1, imported: true, ...(it.fitid ? { fitid: it.fitid } : {}) };
+      if (kind === "card" && it.type === "saida") state.tx.push({ ...base, method: "credito", cartao: id });
+      else state.tx.push({ ...base, method: it.type === "entrada" ? "pix" : "debito", conta: kind === "acc" ? id : cardById(id)?.conta || state.accounts[0].id });
+      novos++;
+    }
   }
+  state.importLog = [...(state.importLog || []), { date: TODAY, arquivos: imp.arquivos.map((a) => a.nome), novos, repetidos }].slice(-20);
+  const ultimo = imp.arquivos.flatMap((a) => a.itens).filter((x) => x.checked).map((x) => mk(x.date)).sort().pop();
+  if (ultimo) ui.month = ultimo <= CUR ? ultimo : CUR;
   normalizeRefs();
   impDialog.close();
-  if (chosen.length) {
-    const last = chosen.map((x) => mk(x.date)).sort().pop();
-    ui.month = last <= CUR ? last : CUR;
-  }
   refresh();
-  alert(`${chosen.length} lançamento(s) importado(s).`);
+  alert(`${novos} lançamento(s) importado(s).${repetidos ? ` ${repetidos} já existiam e foram ignorados.` : ""}`);
 });
 
 // ===== Foto de perfil =====

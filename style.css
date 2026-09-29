@@ -499,3 +499,14 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-si
 .ico-prev .emo { font-size: 17px; }
 .input.emoji { width: 150px; text-align: left; font-size: 12.5px; }
 .emoji-field { flex: 0 0 150px !important; }
+
+/* importação de vários extratos */
+.imp-files { display: flex; flex-direction: column; gap: 8px; max-height: 210px; overflow-y: auto; }
+.imp-file { border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; background: var(--panel-2); }
+.imp-file-top { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; }
+.imp-file-top .small-text { margin: 2px 0 0; }
+.imp-file-dest { display: flex; gap: 6px; align-items: center; flex: none; }
+.imp-file .row { margin-top: 8px; flex-wrap: wrap; }
+.imp-file .row label { font-size: 11.5px; }
+.imp-log:empty { display: none; }
+.imp-log { border-top: 1px solid var(--border); padding-top: 8px; }
