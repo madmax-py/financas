@@ -1,6 +1,8 @@
 // ===== Configuração =====
 const LS_KEY = "financas.v1";
 
+const CORES_CARTAO = ["#6a2fb5", "#0a7d55", "#1b4fa0", "#b3541e", "#2f3640", "#8c1d3f", "#0f6f78", "#b5305f"];
+
 const DEFAULT_CATS = {
   saida: [["Alimentação", "ti-tools-kitchen-2"], ["Moradia", "ti-home"], ["Transporte", "ti-car"],
     ["Lazer", "ti-device-gamepad-2"], ["Saúde", "ti-heartbeat"], ["Educação", "ti-book"],
@@ -82,6 +84,7 @@ let state;
 const ui = {
   month: CUR, lineMode: "dia", yearMode: "ano", editing: null, editingRec: null,
   sort: { key: "date", dir: -1 }, dismissed: new Set(), recCreated: 0, goalEditing: null, depGoal: null,
+  cardSel: null, cardMes: null, cardEditing: null, cardCor: CORES_CARTAO[0], cardLogo: "",
   cloud: false, readOnly: false,
 };
 
@@ -241,7 +244,14 @@ function normalizeRefs(s = state) {
       delete t.cartao;
     }
   }
-  for (const c of s.cards) if (!accIds.has(c.conta)) c.conta = s.accounts[0].id;
+  s.cards.forEach((c, i) => {
+    if (!accIds.has(c.conta)) c.conta = s.accounts[0].id;
+    c.banco ??= "";
+    c.bandeira ??= "";
+    c.final ??= "";
+    c.logo ??= "";
+    c.cor ||= CORES_CARTAO[i % CORES_CARTAO.length];
+  });
 }
 
 const accById = (id) => state.accounts.find((a) => a.id === id) || state.accounts[0];
@@ -377,7 +387,7 @@ function compute() {
   const boletosFuturos = state.tx.filter((t) => t.method === "boleto" && t.type === "saida" && t.date > TODAY);
   const boletos = sum(boletosFuturos, (t) => t.value);
   const guardado = sum(state.goals, (g) => goalSaved(g));
-  return { virt, instReal, pending, debt, cardDebt: debt, boletos, boletosFuturos, devoTotal: debt + boletos,
+  return { virt, instReal, instVirt, pending, debt, cardDebt: debt, boletos, boletosFuturos, devoTotal: debt + boletos,
     bal, balance, faturas, cards, limitTotal, proj, guardado };
 }
 
@@ -474,7 +484,7 @@ function render() {
   const parts = [
     () => renderAlerts(c), () => renderProfile(m), () => renderBars(c, m), () => renderCatStats(m, prev),
     () => renderRight(c, m, prev), () => renderCharts(c, m, prev), renderTable, () => renderParcelas(c),
-    renderRec, renderBoletos, renderGoals, () => renderCatCards(m, prev),
+    () => renderCards(c), renderRec, renderBoletos, renderGoals, () => renderCatCards(m, prev),
   ];
   for (const part of parts) {
     try { part(); } catch (err) { console.error("Erro ao desenhar parte da tela:", err); }
@@ -892,6 +902,209 @@ function renderCatCards(m, prev) {
   }).join("");
 }
 
+
+// ===== Cartões =====
+// Escurece uma cor hex pra formar o degradê do cartão
+function escurecer(hex, f = 0.55) {
+  const n = parseInt(String(hex).replace("#", ""), 16);
+  if (!Number.isFinite(n)) return "#111";
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => Math.round(v * (1 - f)));
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}
+const BANDEIRA_ICONE = { Visa: "ti-brand-visa", Mastercard: "ti-brand-mastercard" };
+
+// O desenho do cartão, usado na tela e na pré-visualização do formulário
+function cartaoVisual(c) {
+  const cor = c.cor || CORES_CARTAO[0];
+  const bandeira = BANDEIRA_ICONE[c.bandeira]
+    ? `<i class="ti ${BANDEIRA_ICONE[c.bandeira]}"></i>`
+    : c.bandeira ? `<span class="cc-flag-txt">${esc(c.bandeira)}</span>` : "";
+  const logo = c.logo
+    ? `<img class="cc-logo" src="${esc(c.logo)}" alt="">`
+    : `<span class="cc-bank">${esc(c.banco || c.name || "")}</span>`;
+  return `<div class="cc" style="--cc:${esc(cor)};--cc2:${esc(escurecer(cor))}">
+    <div class="cc-top">${logo}<i class="ti ti-nfc"></i></div>
+    <div class="cc-chip"></div>
+    <div class="cc-num">•••• •••• •••• ${esc(c.final || "••••")}</div>
+    <div class="cc-bottom">
+      <div><div class="cc-label">titular</div><div class="cc-name">${esc(state.profile.name || c.name)}</div></div>
+      <div class="cc-flag">${bandeira}</div>
+    </div>
+  </div>`;
+}
+
+function renderCards(c) {
+  const total = sum(state.cards, (x) => x.limite || 0);
+  $("#cardsSummary").innerHTML = state.cards.length
+    ? `<span>${state.cards.length} cartão(ões)</span><span>limite total <b>${brl(total)}</b></span>`
+      + `<span>comprometido <b class="neg">${brl(c.cardDebt)}</b></span><span>livre <b class="pos">${brl(Math.max(0, total - c.cardDebt))}</b></span>`
+    : "";
+  $("#cardsGrid").innerHTML = state.cards.length ? state.cards.map((card) => {
+    const info = c.cards.find((x) => x.c.id === card.id) || { used: 0, nextK: null, nextV: 0 };
+    const uso = card.limite ? info.used / card.limite : 0;
+    const sel = ui.cardSel === card.id;
+    return `<div class="card-item${sel ? " sel" : ""}" data-card="${card.id}">
+      ${cartaoVisual(card)}
+      <div class="card-info">
+        <div class="card-line"><b>${esc(card.name)}</b><button class="link-btn" data-card-edit="${card.id}">editar</button></div>
+        <div class="card-line"><span class="muted">Comprometido</span><span class="v neg">${brl(info.used)}</span></div>
+        <div class="mini spend${uso > 0.85 ? " over" : ""}"><i style="width:${clamp01(uso) * 100}%"></i></div>
+        <div class="card-line"><span class="muted">Limite livre</span><span class="v ${card.limite && card.limite - info.used < 0 ? "neg" : "pos"}">${card.limite ? brl(card.limite - info.used) : "sem limite cadastrado"}</span></div>
+        <div class="card-line"><span class="muted">Próxima fatura</span><span class="v">${info.nextK ? `${brl(info.nextV)} em ${fmtDate(dueDay(card, info.nextK))}` : "—"}</span></div>
+        <div class="muted small-text">fecha dia ${card.fecha} · vence dia ${card.vence} · paga com ${esc(accById(card.conta).name)}</div>
+      </div>
+    </div>`;
+  }).join("") : `<div class="empty-card">Nenhum cartão ainda. Clique em "Novo cartão" pra cadastrar o primeiro.</div>`;
+  renderCardDetail(c);
+}
+
+// Detalhe de uma fatura: serve pra bater item a item com o app do banco
+function renderCardDetail(c) {
+  const box = $("#cardDetail");
+  const card = cardById(ui.cardSel);
+  if (!card) { box.innerHTML = state.cards.length ? `<p class="muted small-text">Clique num cartão pra ver as faturas por dentro.</p>` : ""; return; }
+
+  const parcelas = [...c.instReal, ...c.instVirt].filter((x) => x.card?.id === card.id);
+  const meses = [...new Set(parcelas.map((x) => x.due))].sort();
+  if (!meses.length) { box.innerHTML = `<div class="card inner"><div class="card-head">${esc(card.name)}</div><p class="muted small-text">Nenhuma compra nesse cartão ainda.</p></div>`; return; }
+  const mesAtual = meses.includes(ui.cardMes) ? ui.cardMes : (meses.find((k) => k >= CUR) || meses[meses.length - 1]);
+  ui.cardMes = mesAtual;
+
+  const daFatura = parcelas.filter((x) => x.due === mesAtual).sort((a, b) => a.t.date.localeCompare(b.t.date));
+  const totalFatura = sum(daFatura, (x) => x.value);
+  const paga = dueDay(card, mesAtual) < TODAY;
+
+  box.innerHTML = `<div class="card inner">
+    <div class="card-head spread">
+      <span><i class="ti ti-file-invoice"></i> Faturas de ${esc(card.name)}</span>
+      <span class="muted small-text">vence ${fmtDate(dueDay(card, mesAtual))}${paga ? " · já venceu" : ""}</span>
+    </div>
+    <div class="tabs small fatura-tabs">${meses.map((k) => `<button type="button" class="tab ${k === mesAtual ? "active" : ""}" data-fatura="${k}">${mShort(k)}</button>`).join("")}</div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Compra</th><th>Data</th><th>Categoria</th><th>Parcela</th><th class="r">Valor</th></tr></thead>
+        <tbody>
+          ${daFatura.map((x) => `<tr class="${x.t.virtual ? "paused" : ""}">
+            <td class="desc">${esc(x.t.desc)}${x.t.virtual ? ` <span class="tag">previsto</span>` : ""}</td>
+            <td>${fmtDate(x.t.date)}</td>
+            <td>${ico(catEmoji("saida", x.t.cat))} ${esc(x.t.cat)}</td>
+            <td>${x.n > 1 ? `${x.i + 1}/${x.n}` : "à vista"}</td>
+            <td class="r ${x.value < 0 ? "pos" : "neg"}">${x.value < 0 ? "+ " + brl(-x.value) : brl(x.value)}</td>
+          </tr>`).join("") || `<tr><td colspan="5" class="empty">Fatura vazia.</td></tr>`}
+          <tr><td colspan="4"><b>Total da fatura de ${mLabel(mesAtual)}</b></td><td class="r neg"><b>${brl(totalFatura)}</b></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted small-text">Compare esse total com o app do banco. Se não bater, use a <button type="button" class="link-btn" data-open="check">conferência</button> ou ajuste os lançamentos em Lançamentos.</p>
+  </div>`;
+}
+
+$("#cardsGrid").addEventListener("click", (e) => {
+  const edit = e.target.closest("[data-card-edit]");
+  if (edit) return openCard(cardById(edit.dataset.cardEdit));
+  const item = e.target.closest("[data-card]");
+  if (!item) return;
+  ui.cardSel = ui.cardSel === item.dataset.card ? null : item.dataset.card;
+  ui.cardMes = null;
+  render();
+});
+$("#cardDetail").addEventListener("click", (e) => {
+  const f = e.target.closest("[data-fatura]");
+  if (!f) return;
+  ui.cardMes = f.dataset.fatura;
+  render();
+});
+
+// ----- formulário do cartão -----
+const cardDialog = $("#cardDialog"), cardForm = $("#cardForm"), cF = cardForm.elements;
+function previewCartao() {
+  $("#cardPreview").innerHTML = cartaoVisual({
+    name: cF.name.value || "Novo cartão", banco: cF.banco.value, bandeira: cF.bandeira.value,
+    final: cF.final.value.replace(/\D/g, "").slice(0, 4), cor: ui.cardCor, logo: ui.cardLogo,
+  });
+  $("#cardCores").innerHTML = CORES_CARTAO.map((cor) =>
+    `<button type="button" class="cor${cor === ui.cardCor ? " sel" : ""}" data-cor="${cor}" style="background:${cor}" title="${cor}"></button>`).join("")
+    + `<label class="cor custom" title="Outra cor" style="background:${esc(ui.cardCor)}"><input type="color" value="${esc(ui.cardCor)}" id="cardCorCustom"></label>`;
+}
+function openCard(card = null) {
+  ui.cardEditing = card?.id || null;
+  ui.cardCor = card?.cor || CORES_CARTAO[state.cards.length % CORES_CARTAO.length];
+  ui.cardLogo = card?.logo || "";
+  cardForm.reset();
+  $("#cardDialogTitle").textContent = card ? "Editar cartão" : "Novo cartão";
+  cF.name.value = card?.name || "";
+  cF.banco.value = card?.banco || "";
+  cF.bandeira.value = card?.bandeira || "";
+  cF.final.value = card?.final || "";
+  cF.limite.value = card?.limite || "";
+  cF.fecha.value = card?.fecha ?? 1;
+  cF.vence.value = card?.vence ?? 10;
+  cF.conta.innerHTML = state.accounts.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join("");
+  cF.conta.value = card?.conta || state.accounts[0].id;
+  $("#cardDelete").classList.toggle("hidden", !card);
+  previewCartao();
+  cardDialog.showModal();
+  cF.name.focus();
+}
+cardForm.addEventListener("input", previewCartao);
+$("#cardCores").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-cor]");
+  if (!b) return;
+  ui.cardCor = b.dataset.cor;
+  previewCartao();
+});
+$("#cardCores").addEventListener("input", (e) => {
+  if (e.target.id !== "cardCorCustom") return;
+  ui.cardCor = e.target.value;
+  previewCartao();
+});
+$("#cardLogoInput").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const img = new Image();
+  img.onload = () => {
+    const alvo = 160, escala = Math.min(1, alvo / Math.max(img.width, img.height));
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(img.width * escala);
+    cv.height = Math.round(img.height * escala);
+    cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+    ui.cardLogo = cv.toDataURL("image/png");
+    URL.revokeObjectURL(img.src);
+    previewCartao();
+  };
+  img.src = URL.createObjectURL(file);
+  e.target.value = "";
+});
+$("#cardLogoClear").addEventListener("click", () => { ui.cardLogo = ""; previewCartao(); });
+$("#btnNewCard").addEventListener("click", () => openCard());
+$("#cardDelete").addEventListener("click", () => {
+  const card = cardById(ui.cardEditing);
+  if (!card) return;
+  const usados = state.tx.filter((t) => t.cartao === card.id).length;
+  if (!confirm(`Excluir o cartão "${card.name}"?${usados ? ` ${usados} lançamento(s) vão pro primeiro cartão da lista (ou viram compras sem cartão, se não sobrar nenhum).` : ""}`)) return;
+  state.cards = state.cards.filter((x) => x.id !== card.id);
+  if (ui.cardSel === card.id) ui.cardSel = null;
+  normalizeRefs();
+  cardDialog.close();
+  refresh();
+});
+cardForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const dia = (v, padrao) => Math.max(1, Math.min(31, Number(v) || padrao));
+  const dados = {
+    name: cF.name.value.trim(), banco: cF.banco.value.trim(), bandeira: cF.bandeira.value,
+    final: cF.final.value.replace(/\D/g, "").slice(0, 4), limite: round2(Number(cF.limite.value) || 0),
+    fecha: dia(cF.fecha.value, 1), vence: dia(cF.vence.value, 10), conta: cF.conta.value,
+    cor: ui.cardCor, logo: ui.cardLogo,
+  };
+  if (!dados.name) return;
+  if (ui.cardEditing) Object.assign(cardById(ui.cardEditing), dados);
+  else state.cards.push({ id: uid(), ...dados });
+  normalizeRefs();
+  cardDialog.close();
+  refresh();
+});
+
 // ===== CRUD de lançamentos =====
 const txDialog = $("#txDialog"), txForm = $("#txForm"), txF = txForm.elements;
 
@@ -1249,50 +1462,24 @@ const accRow = (a = { id: uid(), name: "", inicial: 0, tipo: "corrente" }) => `
     <input class="input num" type="number" step="0.01" value="${a.inicial || 0}" data-f="inicial" title="Saldo inicial">
     <button type="button" class="icon-btn" data-remove title="Remover"><i class="ti ti-trash"></i></button>
   </div>`;
-const cardRow = (c = { id: uid(), name: "", limite: 0, fecha: 1, vence: 10, conta: "" }) => `
-  <div class="mgr-row" data-id="${c.id}">
-    <input class="input" value="${esc(c.name)}" maxlength="30" placeholder="Nome do cartão" data-f="name" required>
-    <input class="input num" type="number" step="0.01" min="0" value="${c.limite || ""}" placeholder="Limite" data-f="limite" title="Limite">
-    <input class="input day" type="number" min="1" max="31" value="${c.fecha}" data-f="fecha" title="Dia que fecha">
-    <input class="input day" type="number" min="1" max="31" value="${c.vence}" data-f="vence" title="Dia que vence">
-    <select class="select" data-f="conta" data-val="${c.conta}"></select>
-    <button type="button" class="icon-btn" data-remove title="Remover"><i class="ti ti-trash"></i></button>
-  </div>`;
-function refreshCardAccOptions() {
-  const accs = [...$("#accRows").querySelectorAll(".mgr-row")].map((r) => ({ id: r.dataset.id, name: r.querySelector("[data-f=name]").value.trim() || "(sem nome)" }));
-  for (const sel of $("#cardRows").querySelectorAll("[data-f=conta]")) {
-    const v = sel.value || sel.dataset.val;
-    sel.innerHTML = accs.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join("");
-    if (accs.some((a) => a.id === v)) sel.value = v;
-  }
-}
 function openAccounts() {
   $("#accRows").innerHTML = state.accounts.map(accRow).join("");
-  $("#cardRows").innerHTML = state.cards.map(cardRow).join("");
-  refreshCardAccOptions();
   accDialog.showModal();
 }
-$("#btnAddAcc").addEventListener("click", () => { $("#accRows").insertAdjacentHTML("beforeend", accRow()); refreshCardAccOptions(); $("#accRows").lastElementChild.querySelector("input").focus(); });
-$("#btnAddCard").addEventListener("click", () => { $("#cardRows").insertAdjacentHTML("beforeend", cardRow()); refreshCardAccOptions(); $("#cardRows").lastElementChild.querySelector("input").focus(); });
-$("#accRows").addEventListener("input", refreshCardAccOptions);
+$("#btnAddAcc").addEventListener("click", () => { $("#accRows").insertAdjacentHTML("beforeend", accRow()); $("#accRows").lastElementChild.querySelector("input").focus(); });
+
 accForm.addEventListener("click", (e) => {
   const rm = e.target.closest("[data-remove]");
   if (!rm) return;
   if (rm.closest("#accRows") && $("#accRows").children.length === 1) { alert("Precisa ter pelo menos uma conta."); return; }
   rm.closest(".mgr-row").remove();
-  refreshCardAccOptions();
 });
 accForm.addEventListener("submit", (e) => {
   e.preventDefault();
   const get = (row, f) => row.querySelector(`[data-f=${f}]`).value;
   const accounts = [...$("#accRows").querySelectorAll(".mgr-row")].map((r) => ({ id: r.dataset.id, name: get(r, "name").trim(), inicial: round2(Number(get(r, "inicial")) || 0), tipo: get(r, "tipo") }));
-  const day = (v) => Math.max(1, Math.min(31, Number(v) || 1));
-  const cards = [...$("#cardRows").querySelectorAll(".mgr-row")].map((r) => ({ id: r.dataset.id, name: get(r, "name").trim(), limite: round2(Number(get(r, "limite")) || 0), fecha: day(get(r, "fecha")), vence: day(get(r, "vence")), conta: get(r, "conta") }));
-  if (!accounts.length || [...accounts, ...cards].some((x) => !x.name)) { alert("Dê um nome pra cada conta e cartão."); return; }
-  const hadCredit = state.tx.some((t) => t.method === "credito");
-  if (!cards.length && hadCredit && !confirm("Você tem compras no crédito. Sem nenhum cartão, elas vão cair sempre na fatura do mês seguinte. Continuar?")) return;
+  if (!accounts.length || accounts.some((x) => !x.name)) { alert("Dê um nome pra cada conta."); return; }
   state.accounts = accounts;
-  state.cards = cards;
   normalizeRefs();
   accDialog.close();
   refresh();
@@ -1870,7 +2057,7 @@ $("#btnReset").addEventListener("click", () => {
 });
 
 // ===== Navegação =====
-const openers = { cats: openCats, accounts: openAccounts, import: openImport, check: openCheck };
+const openers = { cats: openCats, accounts: openAccounts, import: openImport, check: openCheck, cards: () => mostrarTela("cartoes") };
 document.addEventListener("click", (e) => {
   const op = e.target.closest("[data-open]");
   if (op) {

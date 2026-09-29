@@ -510,3 +510,52 @@ code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-si
 .imp-file .row label { font-size: 11.5px; }
 .imp-log:empty { display: none; }
 .imp-log { border-top: 1px solid var(--border); padding-top: 8px; }
+
+/* ===== tela de cartões ===== */
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+.card-item {
+  border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--panel);
+  cursor: pointer; transition: border-color 0.15s;
+}
+.card-item:hover { border-color: var(--accent-strong); }
+.card-item.sel { border-color: var(--accent); }
+.card-info { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+.card-info .card-line { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; align-items: center; }
+.card-info .v { font-variant-numeric: tabular-nums; }
+.card-info .small-text { margin-top: 2px; }
+
+/* o cartão desenhado */
+.cc {
+  position: relative; aspect-ratio: 1.586; border-radius: 12px; padding: 14px;
+  background: linear-gradient(140deg, var(--cc) 0%, var(--cc2) 100%);
+  color: #fff; display: flex; flex-direction: column; justify-content: space-between;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); overflow: hidden;
+}
+.cc::after {
+  content: ""; position: absolute; inset: -40% -20% auto auto; width: 70%; aspect-ratio: 1;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.16), transparent 65%);
+}
+.cc-top { display: flex; justify-content: space-between; align-items: flex-start; font-size: 13px; }
+.cc-bank { font-weight: 700; letter-spacing: 0.3px; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.cc-logo { max-height: 26px; max-width: 45%; object-fit: contain; }
+.cc-top .ti { font-size: 17px; opacity: 0.75; }
+.cc-chip {
+  width: 34px; height: 25px; border-radius: 5px;
+  background: linear-gradient(135deg, #e8c66a, #b98f2e 60%, #f0d894);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.18);
+}
+.cc-num { font-size: 15px; letter-spacing: 1.6px; font-variant-numeric: tabular-nums; text-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.cc-bottom { display: flex; justify-content: space-between; align-items: flex-end; }
+.cc-label { font-size: 8.5px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.65; }
+.cc-name { font-size: 12.5px; font-weight: 600; }
+.cc-flag .ti { font-size: 30px; }
+.cc-flag-txt { font-weight: 700; font-style: italic; font-size: 14px; }
+.cc-preview { max-width: 280px; margin: 0 auto 6px; }
+
+/* seletor de cor */
+.cores { display: flex; gap: 6px; flex-wrap: wrap; }
+.cor { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.cor.sel { border-color: var(--text); }
+.cor.custom { display: grid; place-items: center; overflow: hidden; position: relative; }
+.cor.custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.fatura-tabs { flex-wrap: wrap; }

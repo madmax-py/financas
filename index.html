@@ -41,6 +41,7 @@
       <button class="tab active" data-tab="geral"><i class="ti ti-layout-dashboard"></i> Visão geral</button>
       <button class="tab" data-tab="lanc"><i class="ti ti-receipt-2"></i> Lançamentos</button>
       <button class="tab" data-tab="parc"><i class="ti ti-credit-card"></i> Parcelamentos</button>
+      <button class="tab" data-tab="cartoes"><i class="ti ti-credit-card"></i> Cartões</button>
       <button class="tab" data-tab="rec"><i class="ti ti-repeat"></i> Recorrentes</button>
       <button class="tab" data-tab="metas"><i class="ti ti-target-arrow"></i> Metas</button>
       <button class="tab" data-tab="cats"><i class="ti ti-category"></i> Categorias</button>
@@ -135,7 +136,7 @@
       </div>
 
       <div class="card">
-        <div class="card-head spread"><i class="ti ti-credit-card"></i> Cartões <button class="link-btn" data-open="accounts">editar</button></div>
+        <div class="card-head spread"><i class="ti ti-credit-card"></i> Cartões <button class="link-btn" data-open="cards">ver todos</button></div>
         <ul class="list card-list" id="cardList"></ul>
       </div>
 
@@ -214,6 +215,15 @@
           <tbody id="parcBody"></tbody>
         </table>
       </div>
+    </div>
+
+    <div class="panel hidden" id="tab-cartoes"><h2 class="screen-title"><i class="ti ti-credit-card"></i> Cartões</h2>
+      <div class="filters">
+        <div class="rec-summary" id="cardsSummary"></div>
+        <button class="btn primary" id="btnNewCard"><i class="ti ti-plus"></i> Novo cartão</button>
+      </div>
+      <div class="cards-grid" id="cardsGrid"></div>
+      <div id="cardDetail"></div>
     </div>
 
     <div class="panel hidden" id="tab-rec"><h2 class="screen-title"><i class="ti ti-repeat"></i> Recorrentes</h2>
@@ -309,7 +319,7 @@
       </div>
       <div class="row wrap">
         <button type="button" class="btn ghost" data-open="cats"><i class="ti ti-category"></i> Categorias e orçamentos</button>
-        <button type="button" class="btn ghost" data-open="accounts"><i class="ti ti-building-bank"></i> Contas e cartões</button>
+        <button type="button" class="btn ghost" data-open="accounts"><i class="ti ti-building-bank"></i> Contas</button>
         <button type="button" class="btn ghost" data-open="import"><i class="ti ti-upload"></i> Importar extrato (CSV/OFX)</button>
         <button type="button" class="btn ghost" data-open="check"><i class="ti ti-circle-check"></i> Fazer conferência</button>
       </div>
@@ -350,14 +360,11 @@
   <!-- MODAL CONTAS E CARTÕES -->
   <dialog id="accDialog" class="wide">
     <form id="accForm" class="form">
-      <h3>Contas e cartões</h3>
+      <h3>Contas</h3>
       <div class="mgr-head"><b><i class="ti ti-building-bank"></i> Contas</b><span class="muted">nome · saldo inicial</span></div>
       <div class="mgr" id="accRows"></div>
       <button type="button" class="btn ghost small" id="btnAddAcc">＋ Conta</button>
-      <div class="mgr-head"><b><i class="ti ti-credit-card"></i> Cartões de crédito</b><span class="muted">nome · limite · dia que fecha · dia que vence · pago pela conta</span></div>
-      <div class="mgr" id="cardRows"></div>
-      <button type="button" class="btn ghost small" id="btnAddCard">＋ Cartão</button>
-      <p class="muted small-text">Compras feitas a partir do dia de fechamento caem na fatura seguinte. Removendo uma conta ou cartão, os lançamentos dele vão pro primeiro da lista.</p>
+      <p class="muted small-text">Removendo uma conta, os lançamentos dela vão pra primeira da lista. Os cartões ficam na tela <b>Cartões</b>.</p>
       <div class="form-actions">
         <button type="button" class="btn ghost" data-close>Cancelar</button>
         <button type="submit" class="btn primary">Salvar</button>
@@ -415,6 +422,46 @@
       <div class="form-actions">
         <button type="button" class="btn ghost" data-close>Fechar</button>
         <button type="submit" class="btn primary" id="checkSubmit">Conferir</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- MODAL CARTÃO -->
+  <dialog id="cardDialog">
+    <form id="cardForm" class="form">
+      <h3 id="cardDialogTitle">Novo cartão</h3>
+      <div class="cc-preview" id="cardPreview"></div>
+      <div class="row">
+        <label>Apelido<input name="name" class="input" required maxlength="24" placeholder="Nubank roxinho"></label>
+        <label>Banco<input name="banco" class="input" maxlength="24" list="bancosList" placeholder="Nubank"></label>
+      </div>
+      <datalist id="bancosList">
+        <option>Nubank</option><option>PicPay</option><option>Inter</option><option>Itaú</option><option>Bradesco</option>
+        <option>Santander</option><option>Caixa</option><option>Banco do Brasil</option><option>C6 Bank</option>
+        <option>Mercado Pago</option><option>Neon</option><option>Original</option><option>BTG</option><option>XP</option>
+      </datalist>
+      <div class="row">
+        <label>Bandeira<select name="bandeira" class="select">
+          <option value="">—</option><option>Visa</option><option>Mastercard</option><option>Elo</option>
+          <option>Amex</option><option>Hipercard</option>
+        </select></label>
+        <label>Final (4 dígitos)<input name="final" class="input" maxlength="4" inputmode="numeric" placeholder="1234"></label>
+      </div>
+      <div class="row">
+        <label>Limite (R$)<input name="limite" class="input" type="number" step="0.01" min="0"></label>
+        <label>Fecha dia<input name="fecha" class="input day" type="number" min="1" max="31" value="1"></label>
+        <label>Vence dia<input name="vence" class="input day" type="number" min="1" max="31" value="10"></label>
+      </div>
+      <label>A fatura sai da conta<select name="conta" class="select"></select></label>
+      <label>Cor<div class="cores" id="cardCores"></div></label>
+      <div class="row wrap">
+        <label class="btn ghost"><i class="ti ti-photo"></i> Escolher logo<input type="file" id="cardLogoInput" accept="image/*" hidden></label>
+        <button type="button" class="btn ghost" id="cardLogoClear"><i class="ti ti-trash"></i> Tirar logo</button>
+        <button type="button" class="btn danger hidden" id="cardDelete"><i class="ti ti-trash"></i> Excluir cartão</button>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn ghost" data-close>Cancelar</button>
+        <button type="submit" class="btn primary">Salvar</button>
       </div>
     </form>
   </dialog>
