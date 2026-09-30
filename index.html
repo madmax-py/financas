@@ -35,20 +35,36 @@
   </aside>
 
   <header class="topbar">
-    <button class="icon-btn menu-btn" id="btnMenu" title="Menu" aria-label="Abrir menu"><i class="ti ti-menu-2"></i></button>
-    <div class="brand"><i class="ti ti-wallet"></i> <span>Minhas Finanças</span></div>
-    <nav class="tabs main-tabs" id="mainTabs">
-      <button class="tab active" data-tab="geral"><i class="ti ti-layout-dashboard"></i> Visão geral</button>
-      <button class="tab" data-tab="lanc"><i class="ti ti-receipt-2"></i> Lançamentos</button>
-      <button class="tab" data-tab="parc"><i class="ti ti-credit-card"></i> Parcelamentos</button>
-      <button class="tab" data-tab="cartoes"><i class="ti ti-credit-card"></i> Cartões</button>
-      <button class="tab" data-tab="rec"><i class="ti ti-repeat"></i> Recorrentes</button>
-      <button class="tab" data-tab="metas"><i class="ti ti-target-arrow"></i> Metas</button>
-      <button class="tab" data-tab="cats"><i class="ti ti-category"></i> Categorias</button>
+    <div class="topbar-left">
+      <button class="icon-btn menu-btn" id="btnMenu" title="Menu" aria-label="Abrir menu"><i class="ti ti-menu-2"></i></button>
+      <div class="brand"><i class="ti ti-wallet"></i> <span>Minhas Finanças</span></div>
+    </div>
+    <nav class="main-tabs" id="mainTabs">
+      <button class="tab active" data-tab="geral" title="Visão geral"><i class="ti ti-layout-dashboard"></i> <span>Visão geral</span></button>
+      <button class="tab" data-tab="lanc" title="Lançamentos"><i class="ti ti-receipt-2"></i> <span>Lançamentos</span></button>
+      <button class="tab" data-tab="parc" title="Parcelamentos"><i class="ti ti-calendar-dollar"></i> <span>Parcelamentos</span></button>
+      <button class="tab" data-tab="cartoes" title="Cartões"><i class="ti ti-credit-card"></i> <span>Cartões</span></button>
+      <button class="tab" data-tab="rec" title="Recorrentes"><i class="ti ti-repeat"></i> <span>Recorrentes</span></button>
+      <button class="tab" data-tab="metas" title="Metas"><i class="ti ti-target-arrow"></i> <span>Metas</span></button>
+      <button class="tab" data-tab="cats" title="Categorias"><i class="ti ti-category"></i> <span>Categorias</span></button>
     </nav>
     <div class="topbar-right">
       <select id="monthSel" class="select" title="Mês em foco"></select>
       <button class="icon-btn" id="btnSettings" title="Configurações"><i class="ti ti-settings"></i></button>
+      <div class="me">
+        <button class="avatar" id="avatar" title="Perfil" aria-haspopup="true" aria-expanded="false">
+          <img id="photo" alt="">
+          <i class="ti ti-user"></i>
+        </button>
+        <div class="me-menu hidden" id="meMenu">
+          <div class="me-name" id="profileName"></div>
+          <div class="save-status" id="saveStatus"></div>
+          <label class="me-item"><i class="ti ti-photo-plus"></i> Trocar foto
+            <input type="file" accept="image/*" id="photoInput" hidden>
+          </label>
+          <button class="me-item" data-me="settings"><i class="ti ti-settings"></i> Configurações</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -59,19 +75,6 @@
   <main class="grid">
     <!-- ESQUERDA -->
     <aside class="col">
-      <div class="card profile">
-        <div class="profile-top">
-          <span class="rank-chip"><i class="ti ti-coin"></i> <span id="rankLabel">—</span></span>
-        </div>
-        <label class="photo" title="Trocar foto">
-          <img id="photo" alt="">
-          <span class="photo-empty"><i class="ti ti-photo-plus"></i><br>foto de perfil</span>
-          <input type="file" accept="image/*" id="photoInput" hidden>
-        </label>
-        <div class="profile-name" id="profileName"></div>
-        <div class="save-status" id="saveStatus"></div>
-      </div>
-
       <div class="section-title"><i class="ti ti-bolt"></i> Saúde financeira</div>
       <div id="bars" class="bars"></div>
 
@@ -87,6 +90,7 @@
       <div class="card">
         <div class="card-head title-row">
           <span class="page-title">Visão do mês</span>
+          <span class="rank-chip"><i class="ti ti-coin"></i> <span id="rankLabel">—</span></span>
         </div>
         <div class="chart-box radar-box"><canvas id="radarChart"></canvas></div>
         <div class="chart-foot" id="radarFoot"><i class="ti ti-sparkles"></i> Gastos por categoria · tracejado = orçamento</div>

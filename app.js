@@ -172,6 +172,7 @@ function flush() {
 function setSaveStatus(s) {
   const el = $("#saveStatus");
   el.className = `save-status ${s}`;
+  $("#avatar").dataset.save = s;
   el.textContent = { saving: "● salvando…", ok: "● salvo", error: "● erro ao salvar" }[s];
   el.title = s !== "error" ? (ui.cloud ? "Dados salvos na nuvem" : "Dados salvos em dados.json")
     : ui.readOnly ? "Os dados não carregaram direito, então nada está sendo salvo. Recarregue a página."
@@ -540,7 +541,7 @@ function renderAlerts(c) {
 
 function renderProfile(m) {
   const p = state.profile;
-  $(".photo").classList.toggle("has-img", !!p.photo);
+  $("#avatar").classList.toggle("has-img", !!p.photo);
   $("#photo").src = p.photo || "";
   const nameEl = $("#profileName");
   nameEl.innerHTML = p.name ? esc(p.name) : 'Clique em <i class="ti ti-settings"></i> pra colocar seu nome';
@@ -2026,6 +2027,16 @@ $("#btnLogout").addEventListener("click", async () => {
   await fetch("api/logout", { method: "POST" }).catch(() => {});
   location.reload();
 });
+// menu do perfil (avatar no canto da barra)
+const meMenu = $("#meMenu"), avatar = $("#avatar");
+const abrirPerfil = (abrir) => { meMenu.classList.toggle("hidden", !abrir); avatar.setAttribute("aria-expanded", abrir); };
+avatar.addEventListener("click", () => abrirPerfil(meMenu.classList.contains("hidden")));
+document.addEventListener("click", (e) => { if (!e.target.closest(".me")) abrirPerfil(false); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") abrirPerfil(false); });
+meMenu.addEventListener("click", (e) => {
+  if (e.target.closest('[data-me="settings"]')) { abrirPerfil(false); $("#btnSettings").click(); }
+});
+$("#photoInput").addEventListener("change", () => abrirPerfil(false));
 $("#btnRemovePhoto").addEventListener("click", () => { state.profile.photo = ""; save(); render(); });
 $("#btnExport").addEventListener("click", () => {
   const a = document.createElement("a");
